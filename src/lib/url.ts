@@ -3,6 +3,7 @@ import "server-only";
 import { headers } from "next/headers";
 
 import { env } from "@/lib/env";
+import { publicOrigin } from "@/lib/http/forwarded";
 
 /**
  * The origin the current request actually arrived on.
@@ -13,14 +14,16 @@ import { env } from "@/lib/env";
  */
 export async function requestOrigin(): Promise<string> {
   const headerList = await headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
 
-  if (!host) return env.NEXT_PUBLIC_APP_URL;
-
-  const proto =
-    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-
-  return `${proto}://${host}`;
+  // Shared with the edge proxy: see src/lib/http/forwarded.ts for why the scheme is
+  // inferred from the host rather than taken from x-forwarded-proto.
+  return (
+    publicOrigin(
+      headerList.get("x-forwarded-host"),
+      headerList.get("host"),
+      headerList.get("x-forwarded-proto"),
+    ) ?? env.NEXT_PUBLIC_APP_URL
+  );
 }
 
 export async function absoluteUrl(path: string): Promise<string> {

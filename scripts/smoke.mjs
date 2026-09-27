@@ -876,19 +876,68 @@ console.log("\nBehind a reverse proxy");
 {
   const publicHost = "3000-smoketest.e2b.app";
 
+  const proxyHeaders = {
+    host: "localhost:3000",
+    "x-forwarded-host": publicHost,
+    "x-forwarded-proto": "https",
+  };
   const redirect = await fetch(new URL("/today", BASE), {
     redirect: "manual",
-    headers: {
-      host: "localhost:3000",
-      "x-forwarded-host": publicHost,
-      "x-forwarded-proto": "https",
-    },
+    headers: proxyHeaders,
   });
   const location = redirect.headers.get("location") ?? "";
   check(
     "protected routes redirect to the browser's own host",
-    location.startsWith(`https://${publicHost}/login`),
+    location === `https://${publicHost}/login?next=%2Ftoday`,
     location,
+  );
+
+  // The scheme has to survive a proxy that says nothing about it. Next fills in
+  // `x-forwarded-proto: http` itself in that case — the hop into this server, not the
+  // one the browser made — and an http:// redirect handed to an HTTPS page is blocked
+  // as mixed content, which is indistinguishable from the app being down.
+  const bare = await fetch(new URL("/today", BASE), {
+    redirect: "manual",
+    headers: { "x-forwarded-host": publicHost },
+  });
+  const bareLocation = bare.headers.get("location") ?? "";
+  check(
+    "no http:// redirect leaks when the proxy omits the scheme",
+    bareLocation === `https://${publicHost}/login?next=%2Ftoday`,
+    bareLocation,
+  );
+
+  // Loopback must stay on http, or local development breaks.
+  const local = await fetch(new URL("/today", BASE), { redirect: "manual" });
+  check(
+    "  — but loopback stays on http",
+    (local.headers.get("location") ?? "") === `${new URL(BASE).origin}/login?next=%2Ftoday`,
+    local.headers.get("location") ?? "",
+  );
+
+  // A server action is a fetch expecting a Flight response. Redirecting it to the
+  // login page hands React HTML it cannot parse, so the button just dies. The action
+  // re-checks the session itself and answers in a format the client understands.
+  const actionPage = await fetch(new URL("/onboarding/subjects", BASE), {
+    redirect: "manual",
+    headers: proxyHeaders,
+  });
+  check(
+    "a signed-out server action is not redirected mid-flight",
+    actionPage.status === 307,
+    `page ${actionPage.status}`,
+  );
+  const signedOutAction = await fetch(new URL("/onboarding/subjects", BASE), {
+    method: "POST",
+    redirect: "manual",
+    headers: { ...proxyHeaders, "next-action": "0123456789abcdef", accept: "text/x-component" },
+    body: new URLSearchParams({ 0: "[]" }),
+  });
+  check(
+    "  — it reaches the action instead of the login page",
+    signedOutAction.status !== 307 ||
+      (signedOutAction.headers.get("location") ?? "").startsWith("/login") === false,
+    `${signedOutAction.status} → ${signedOutAction.headers.get("location") ?? "no redirect"}`,
   );
 
   // Origin is the public host, the server only knows its own: Next treats a mismatch

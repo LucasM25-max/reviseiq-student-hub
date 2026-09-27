@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { authConfig } from "@/lib/auth/auth.config";
+import { publicOrigin } from "@/lib/http/forwarded";
 
 /**
  * Coarse route protection.
@@ -37,22 +38,20 @@ const PROTECTED = [
 /**
  * Builds a redirect target on the origin the browser actually used.
  *
- * `request.nextUrl.origin` is the origin the server is bound to, which behind any
- * reverse proxy — preview sandboxes, tunnels, a load balancer — is not the origin the
- * browser is talking to. Redirecting there sends the student to `localhost` on their
- * own machine. `x-forwarded-host` is the proxy's statement of the public host, so
- * prefer it, then the Host header, and only then fall back.
+ * Next's middleware resolves the Location header as an absolute URL, so a relative
+ * one is not an option here — the origin has to be reconstructed from proxy headers.
+ * `publicOrigin` is shared with the server-side URL helpers so the two cannot
+ * disagree about the scheme; getting that wrong sends an HTTPS page to an `http://`
+ * URL, which the browser blocks as mixed content.
  */
 function publicUrl(request: NextRequest, path: string): URL {
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const host = forwardedHost ?? request.headers.get("host");
-  if (!host) return new URL(path, request.nextUrl.origin);
+  const origin = publicOrigin(
+    request.headers.get("x-forwarded-host"),
+    request.headers.get("host"),
+    request.headers.get("x-forwarded-proto"),
+  );
 
-  const proto =
-    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
-    request.nextUrl.protocol.replace(":", "");
-
-  return new URL(path, `${proto}://${host}`);
+  return new URL(path, origin ?? request.nextUrl.origin);
 }
 
 const proxy = auth((request) => {
@@ -62,14 +61,23 @@ const proxy = auth((request) => {
   const isGuestOnly = GUEST_ONLY.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-  if (isProtected && !signedIn) {
+  /**
+   * A server action is a `fetch`, not a navigation, and it expects a React Flight
+   * response. Answering one with a redirect to the login *page* gives the client HTML
+   * it cannot parse, and the redirect is followed opaquely, so the student sees a
+   * dead button rather than a login screen. The actions all re-check the session
+   * themselves and reply with a redirect the client understands, so let them answer.
+   */
+  const isServerAction = request.method === "POST" && request.headers.has("next-action");
+
+  if (isProtected && !signedIn && !isServerAction) {
     const url = publicUrl(request, "/login");
     // Preserve where they were heading so the deep links in Today survive a login.
     url.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(url);
   }
 
-  if (isGuestOnly && signedIn) {
+  if (isGuestOnly && signedIn && !isServerAction) {
     return NextResponse.redirect(publicUrl(request, "/today"));
   }
 
