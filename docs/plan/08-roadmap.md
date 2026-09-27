@@ -4,10 +4,19 @@
 all four pages genuinely working end to end.** Everything below is ordered to get there, then to
 widen.
 
-`4.1.1` is a well-chosen slice: it is diagram-dense (exercising the hand-built SVG approach, D18),
-it carries a required practical, it involves a maths skill, and it contains Higher-only material —
-so it exercises tier filtering, practical sheets, widgets and the formula/maths handling rather
-than just prose. Confirm the exact spec-point list at handover.
+`4.1.1` is diagram-dense (exercising the hand-built SVG approach, D18), it carries a required
+practical, and it involves a maths skill — so it exercises practical sheets, widgets and maths
+handling rather than just prose.
+
+> **Correction (27 Sep 2026).** This section previously claimed `4.1.1` also contains Higher-only
+> material and would therefore exercise tier filtering. Checking the specification directly, it
+> does not: the only HT-only line in the whole of `4.1.1` is in `4.1.1.6`. **Tier filtering will
+> still be untested when the vertical slice is declared done**, and a green build is not evidence
+> that it works. The first real test of it arrives with whichever slice first carries HT content.
+>
+> Scope has also narrowed and reordered. Slices now follow AQA's scheme-of-work teaching order
+> rather than specification numbering (D44), which puts `4.1.1.2` first. See
+> [`slices/`](./slices/) for what is actually being authored.
 
 Sizes are relative (S / M / L / XL). Each phase is one pull request on
 `arena/01a0de94-reviseiq-student-hub`, demoable on a Vercel preview before the next begins.
@@ -137,6 +146,33 @@ The pipeline from doc 04, exercised on your first real Biology source material.
 
 **Exit:** `npm run content:seed` populates Postgres from files; the coverage report prints an honest
 per-sub-topic table; CI fails on a deliberately broken content file.
+
+---
+
+## Phase 3b — Practical engine · **XL**
+
+New workstream, added 27 Sep 2026 (D45). Required practicals are built as interactive simulations
+a student actually performs, starting with **RP1 Microscopy**. Fully specified in
+[`slices/biology-4.1.1.2-animal-and-plant-cells.md`](./slices/biology-4.1.1.2-animal-and-plant-cells.md) §4.
+
+- Pure, DOM-free state machine: reducer, fault model, optics, graticule arithmetic, rubric (D46)
+- The `microscope-practical` widget — a thin React renderer over derived state
+- SVG cell fields at three magnifications, with focus, stain, iris and bubble states
+- Freehand drawing captured as vectors; deterministic geometry rubric; narrowly-scoped AI
+  judgement; advisory-only marks (D47)
+- Keyboard-operable throughout, with a live text description of the field of view
+
+**Why it is its own phase:** it is the largest component in the product after the Today engine, and
+it does not belong inside a content pipeline. **It must not block `4.1.1.2`** — lessons 1–2, notes
+and the content question bank ship first, with the practical arriving behind them.
+
+**The risk to manage:** this is the kind of component that sits at 80% done for a long time. Build
+it against the fixed fault table and acceptance list in the slice doc, and stop when they pass,
+rather than polishing open-endedly.
+
+**Exit:** a student completes all 20 steps of AQA's student sheet, makes a technique mistake, sees
+the consequence in the field of view, and answers an exam question about why that step matters —
+with the whole simulation's logic covered by `vitest` and no browser required.
 
 ---
 
