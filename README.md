@@ -60,6 +60,18 @@ npm run dev              # http://localhost:3000
 is already running is reused. The development database lives in `.devdb/`, so accounts
 and progress survive a restart. `npm run db:reset` throws it away and starts over.
 
+The seed creates a demo student so there is always a way in:
+
+```
+demo@reviseiq.app / revise-with-me-2026
+```
+
+It is reset to the start of onboarding every time the seed runs, and it is never created
+when `NODE_ENV=production`. This matters in throwaway environments: sessions are stateless
+JWTs signed with a secret derived from the project path, so when a sandbox is rebuilt the
+browser keeps a token that still decodes while the account behind it has gone with the
+database. Without a fixed account the only way back in is to register again each time.
+
 Sign up with any email address. Without `RESEND_API_KEY` nothing is actually emailed: the
 verification and reset links are printed to the server console, saved as HTML in `./.mail`, and
 surfaced directly in the page, so both flows are fully usable offline.

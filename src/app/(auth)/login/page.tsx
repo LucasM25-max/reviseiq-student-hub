@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { LoginForm } from "@/components/auth/login-form";
@@ -11,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth/session";
 import { safeRedirectPath } from "@/lib/url";
 
 export const metadata: Metadata = {
@@ -39,6 +41,14 @@ export default async function LoginPage({
   };
 
   const next = safeRedirectPath(first("next"), "/today");
+
+  /**
+   * Checked here rather than in the proxy because only this side can tell a real
+   * account from a cookie that merely still decodes. Someone holding a token for a
+   * deleted account has to be able to reach this form and sign in again.
+   */
+  if (await getCurrentUser()) redirect(next);
+
   const error = first("error");
   const justCreated = first("created") === "1";
   const justReset = first("reset") === "1";

@@ -18,12 +18,6 @@ import { publicOrigin } from "@/lib/http/forwarded";
 
 const { auth } = NextAuth(authConfig);
 
-/**
- * Routes that only make sense when signed out. `/reset-password` is deliberately absent:
- * a reset link has to work even if the browser still holds a stale session.
- */
-const GUEST_ONLY = ["/login", "/signup", "/forgot-password"];
-
 /** Everything under these prefixes requires a session. */
 const PROTECTED = [
   "/today",
@@ -58,7 +52,6 @@ const proxy = auth((request) => {
   const { pathname, search } = request.nextUrl;
   const signedIn = Boolean(request.auth?.user);
 
-  const isGuestOnly = GUEST_ONLY.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   /**
@@ -77,10 +70,19 @@ const proxy = auth((request) => {
     return NextResponse.redirect(url);
   }
 
-  if (isGuestOnly && signedIn && !isServerAction) {
-    return NextResponse.redirect(publicUrl(request, "/today"));
-  }
-
+  /**
+   * Sending a signed-in student away from /login and /signup is deliberately *not*
+   * done here.
+   *
+   * A decodable cookie is not the same thing as a real account. The token is a
+   * stateless JWT, so it stays valid after the account behind it is gone — deleted,
+   * soft-deleted, or wiped with a rebuilt database. Bouncing on that alone creates a
+   * loop with no exit: /login sees a token and forwards to /today, /today looks the
+   * user up, finds nothing and forwards back to /login. The student is locked out of
+   * the one page that could fix it.
+   *
+   * The pages make that call instead, where Prisma can confirm the account exists.
+   */
   return NextResponse.next();
 });
 

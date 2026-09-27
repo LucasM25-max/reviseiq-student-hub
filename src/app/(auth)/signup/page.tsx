@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { SignupForm } from "@/components/auth/signup-form";
@@ -10,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Create an account",
@@ -17,7 +19,10 @@ export const metadata: Metadata = {
     "Create a free ReviseIQ account and get a GCSE science revision plan built around what you actually need to work on.",
 };
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  // See the login page: a decodable cookie is not proof the account still exists.
+  if (await getCurrentUser()) redirect("/today");
+
   return (
     <Card>
       <CardHeader>

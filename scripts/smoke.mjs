@@ -444,6 +444,48 @@ console.log("\nThe app shell");
     "signed-in students are bounced off /login",
     guestOnly.status === 307 && (guestOnly.headers.get("location") ?? "").includes("/today"),
   );
+
+  /**
+   * A session token outlives the account it names: it is a stateless JWT, signed with
+   * a secret that survives a rebuilt database. So a token can decode perfectly while
+   * the user behind it is gone — deleted, soft-deleted, or wiped with the database.
+   *
+   * Deciding "signed in" from the token alone used to trap that student in a loop with
+   * no exit: /login saw a token and forwarded to /today, /today looked the account up,
+   * found nothing and forwarded back. The login form has to stay reachable.
+   */
+  const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await db.connect();
+  const soft = await db.query(
+    `UPDATE "User" SET "deletedAt" = now() WHERE "email" = $1 AND "deletedAt" IS NULL`,
+    [email],
+  );
+
+  try {
+    check(
+      "the account can be soft-deleted for the next check",
+      soft.rowCount === 1,
+      `${soft.rowCount} row(s)`,
+    );
+
+    const orphanedLogin = await request("/login");
+    check(
+      "a token for a deleted account can still reach the login form",
+      orphanedLogin.status === 200,
+      `${orphanedLogin.status} → ${orphanedLogin.headers.get("location") ?? "no redirect"}`,
+    );
+
+    const orphanedToday = await request("/today");
+    check(
+      "  — and a protected page sends it there rather than looping",
+      orphanedToday.status === 307 &&
+        (orphanedToday.headers.get("location") ?? "").includes("/login"),
+      `${orphanedToday.status} → ${orphanedToday.headers.get("location") ?? "no redirect"}`,
+    );
+  } finally {
+    await db.query(`UPDATE "User" SET "deletedAt" = NULL WHERE "email" = $1`, [email]);
+    await db.end();
+  }
 }
 
 console.log("\nContent — Biology 4.1.1 (Phase 3)");
