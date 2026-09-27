@@ -25,14 +25,30 @@ Sizes are relative (S / M / L / XL). Each phase is one pull request on
 
 Roughly twelve months from now. Indicative, assuming steady progress:
 
-| Window              | Phases  | Milestone                                                                          |
-| ------------------- | ------- | ---------------------------------------------------------------------------------- |
-| Oct – Nov 2026      | P0–P3   | Deployed app, auth, onboarding, content spine, `4.1.1` authored                    |
-| Dec 2026 – Jan 2027 | P4–P5   | Learn working; AI marking working                                                  |
-| Feb – Mar 2027      | P6–P7   | Revise + FSRS; **Today engine — the vertical slice is done**                       |
-| Apr 2027            | P8      | Mocks, grade estimates                                                             |
-| May 2027            | P9–P10  | Habit layer, calendar/school tests, tutor, widgets — **software feature-complete** |
-| Jun – Sep 2027      | P11–P13 | Hardening, PDF export, and **all remaining capacity on content**                   |
+| Window              | Phases  | Milestone                                                               |
+| ------------------- | ------- | ----------------------------------------------------------------------- |
+| Oct – Nov 2026      | P0–P3   | Deployed app, auth, onboarding, content spine, `4.1.1.2` authored       |
+| Dec 2026 – Jan 2027 | P4, P4b | Learn + widget engines; **practical engine**                            |
+| Feb – Mar 2027      | P5–P6   | AI marking working; Revise + FSRS                                       |
+| Apr 2027            | P7      | **Today engine — the vertical slice is done**                           |
+| May 2027            | P8–P9   | Mocks, grade estimates, habit layer                                     |
+| Jun 2027            | P10–P11 | Tutor, calendar/school tests, hardening — **software feature-complete** |
+| Jul – Sep 2027      | P12–P13 | PDF export, and **all remaining capacity on content**                   |
+
+> **Re-planned 27 Sep 2026, and it costs a month.** Adding the practical engine (P4b, XL) and
+> moving the widget engines forward pushes the vertical slice from March to **April 2027** and
+> shortens the final content window from four months to **three**. Content was already the binding
+> constraint against D34, so this is a real cost, not a rounding error.
+>
+> Two things make it worth paying. The widget move is not optional — Phase 10 previously owned the
+> first interactive widgets, but lessons 1 and 2 of the very first slice use four of them, so
+> leaving them in P10 would mean shipping the first lessons with holes in them for five months.
+> And the practical engine is what turns a required practical from something a student reads into
+> something they do.
+>
+> **The lever, if the slip is unacceptable:** move P4b to after P7. The vertical slice then lands
+> in March as originally planned and RP1 ships as a static practical sheet until the engine
+> arrives. Nothing else in the plan depends on it.
 
 **The honest risk:** the software fits comfortably; three subjects × two tiers × a full spec in the
 remaining window does not, on any realistic authoring rate. Two ways to land it:
@@ -143,15 +159,35 @@ The pipeline from doc 04, exercised on your first real Biology source material.
 - `content:validate` (schema + coverage) wired into CI; `content:seed` (idempotent, upsert by ID)
 - First topic's lessons, notes, questions + mark schemes, blurt prompts, practical sheets
 - The diagram registry and the first 2–3 hand-built SVG components (D18)
+- **The RP1 fault table, authored as content data** (D50), and the five practical questions derived
+  from it — neither waits for the simulation engine in P4b
 
 **Exit:** `npm run content:seed` populates Postgres from files; the coverage report prints an honest
 per-sub-topic table; CI fails on a deliberately broken content file.
 
 ---
 
-## Phase 3b — Practical engine · **XL**
+## Phase 4 — Learn + widget engines · **XL**
 
-New workstream, added 27 Sep 2026 (D45). Required practicals are built as interactive simulations
+- Block renderers for every block type (doc 01 §3)
+- Lesson runner: progressive reveal, progress rail, resume, inline `check` blocks
+- End-of-lesson mastery check drawing from the real question bank
+- `LessonProgress` tracking and time-on-task
+- **The four generic widget engines** (D40): `label-the-diagram`, `comparison-table`,
+  `scale-explorer`, `card-sort` — moved forward from P10, because lessons 1 and 2 of the first
+  slice use all four and a `widget` block cannot render without them
+- (AI tutor deferred to P10 — the "I don't get this" button ships disabled with a "coming soon")
+
+**Exit:** a student can work through a complete Biology lesson, be stopped by checks, leave halfway
+and resume exactly where they were.
+
+---
+
+## Phase 4b — Practical engine · **XL**
+
+New workstream, added 27 Sep 2026 (D45). Sits after Learn because the practical renders as a
+lesson block and is that system's most demanding consumer — a good architectural stress test early
+rather than late. Required practicals are built as interactive simulations
 a student actually performs, starting with **RP1 Microscopy**. Fully specified in
 [`slices/biology-4.1.1.2-animal-and-plant-cells.md`](./slices/biology-4.1.1.2-animal-and-plant-cells.md) §4.
 
@@ -166,6 +202,11 @@ a student actually performs, starting with **RP1 Microscopy**. Fully specified i
 it does not belong inside a content pipeline. **It must not block `4.1.1.2`** — lessons 1–2, notes
 and the content question bank ship first, with the practical arriving behind them.
 
+**Why the questions do not wait for it (D50):** the fault table is _data_, authored in Phase 3
+alongside the rest of the content. The engine in this phase renders it. That split is what lets the
+five practical questions be written and marked months before the simulation exists, while still
+guaranteeing they never drift from it — there is still only one fault table.
+
 **The risk to manage:** this is the kind of component that sits at 80% done for a long time. Build
 it against the fixed fault table and acceptance list in the slice doc, and stop when they pass,
 rather than polishing open-endedly.
@@ -175,17 +216,6 @@ the consequence in the field of view, and answers an exam question about why tha
 with the whole simulation's logic covered by `vitest` and no browser required.
 
 ---
-
-## Phase 4 — Learn · **L**
-
-- Block renderers for every block type (doc 01 §3)
-- Lesson runner: progressive reveal, progress rail, resume, inline `check` blocks
-- End-of-lesson mastery check drawing from the real question bank
-- `LessonProgress` tracking and time-on-task
-- (AI tutor deferred to P10 — the "I don't get this" button ships disabled with a "coming soon")
-
-**Exit:** a student can work through a complete Biology lesson, be stopped by checks, leave halfway
-and resume exactly where they were.
 
 ---
 
@@ -281,16 +311,15 @@ and is invited — not pressured — back at 18:30.
 
 ---
 
-## Phase 10 — AI tutor + interactive widgets · **L**
+## Phase 10 — AI tutor · **M**
 
 - Grounded, streamed in-lesson tutor with turn caps, refusal behaviour and full logging (doc 06 §4)
 - **"Why did I lose this mark?"** (D31) — the answer-aware tutor on the marking breakdown, with the
   after-marking-only guardrails
-- The first interactive widgets (D13): label-the-diagram built on existing SVG components,
-  then 2–3 genuinely interactive simulations chosen for where they teach best
+- (Interactive widgets moved to P4; the practical simulation is P4b)
 
 **Exit:** "I don't get this" gives a useful, on-spec explanation; "why did I lose this mark?"
-correctly diagnoses a real misconception; at least one widget makes a concept clearer than prose.
+correctly diagnoses a real misconception.
 
 ---
 

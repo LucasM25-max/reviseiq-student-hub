@@ -119,6 +119,29 @@ to from Today.
 }
 ```
 
+### Numeric answers with a tolerance band (D49)
+
+Calculation and **estimation** questions cannot be marked against a single expected value. AQA's
+convention is to accept a range and to credit the method independently, so a question may carry a
+`numericAnswer` alongside its mark points:
+
+```ts
+numericAnswer: {
+  accept: { min: 4, max: 6 },        // tolerance window, not a point value
+  unit: "µm",
+  significantFigures: 1,
+  methodPoints: [                     // awarded even when the final value misses the window
+    { id: "mp1", text: "<the judgement or step being credited>", marks: 1 },
+  ],
+  ecf: true,                          // a wrong value carries forward into later parts
+}
+```
+
+**Anything with a `numericAnswer` is marked deterministically in the app, never by the model.**
+Checking whether a number falls in a range is a comparison, not a language judgement — it is
+instant, free and exactly right every time. Sending it to Gemini would cost money to become less
+reliable. The AI marker is for open prose, which is where it earns its keep.
+
 Two rules that matter downstream:
 
 1. **Mark points must be atomic and independently awardable.** The AI marker returns a verdict per

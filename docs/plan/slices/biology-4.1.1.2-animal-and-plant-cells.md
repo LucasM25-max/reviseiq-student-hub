@@ -352,9 +352,10 @@ The whole point of §4.2. With no browser available, coverage comes from the red
 
 ### 4.10 Effort and roadmap impact
 
-This is the largest single component in the product after the Today engine, and it is not in the
-current roadmap at all. It needs its own phase rather than being absorbed into Phase 3's content
-pipeline. Rough shape of the work, largest first: the SVG cell fields and their focus/stain states;
+This is the largest single component in the product after the Today engine. It is now **Phase 4b**
+in the roadmap, sitting immediately after Learn — see [doc 08](../08-roadmap.md#phase-4b--practical-engine--xl).
+Its fault table is authored earlier, as content data in Phase 3 (D50), so the five practical
+questions never wait on the engine. Rough shape of the work, largest first: the SVG cell fields and their focus/stain states;
 the freehand capture and geometry rubric; the reducer, fault and optics model; the AI drawing
 judgement, which is the only genuinely uncertain piece.
 
@@ -362,6 +363,91 @@ The honest risk: **it is the kind of component that is 80% done for a long time.
 built against a fixed fault table and acceptance list (§9) rather than polished open-endedly, and
 `4.1.1.2` should not be blocked on it — lessons 1 and 2, the notes and the content questions can
 all ship first.
+
+---
+
+## 4b. Estimation — `bio-4112-est`
+
+This was the open question in the previous draft: the vaguest thing in the spec extract, and the
+hardest to write a fair mark scheme for. It is now answered.
+
+### The three formats we will author
+
+| Format                            | Shape                                                                                                                            | Skills       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| **Count across a known distance** | A field of view or scale bar of known length. Count how many cells fit end to end, divide. _5 cells across 300 µm → 60 µm each._ | MS 1d        |
+| **Fraction of a known cell**      | The cell's actual size is given. Judge what fraction of it a structure spans, multiply. _Nucleus ≈ ¼ of a 20 µm cell → 5 µm._    | MS 1d, MS 3a |
+| **Area**                          | How many nuclei would tile the cell's area; divide. _30 × 15 = 450 µm², ~18 nuclei → 25 µm² each._                               | MS 1d        |
+
+Area matters because the spec says "relative size **or area**", and area estimation behaves
+differently from length — students routinely halve a length and expect to have halved the area.
+
+**Deferred to the `4.1.1.1` slice:** orders of magnitude in standard form. Those are MS 1b and
+MS 2h, which the specification attaches to `4.1.1.1`, not here.
+
+### The mark scheme structure this forces (D49)
+
+An estimation question cannot be marked against a single expected value — the whole point is that
+reasonable students reading the same diagram get different numbers. AQA's convention is to accept a
+**range** and to credit the **method** independently. Our mark-scheme schema has no way to express
+either, so it gains one:
+
+```ts
+numericAnswer: {
+  accept: { min: 4, max: 6 },        // the tolerance window, not a point value
+  unit: "µm",
+  methodPoints: [                     // awarded even if the final value misses the window
+    { id: "mp1", text: "judges the nucleus as roughly one quarter of the cell width", marks: 1 },
+  ],
+  ecf: true,                          // a wrong estimate carries forward into later steps
+}
+```
+
+**These are marked deterministically in the app, not by Gemini.** Checking whether a number falls
+in a range is a comparison, not a language judgement. It is instant, free, perfectly reliable, and
+it keeps the AI marker for genuinely open prose — which is where it earns its cost.
+
+### Baseline sizes a student is expected to know
+
+Corrected against multiple independent sources, because two of the figures supplied were wrong:
+
+| Structure     | Size         | Note                                                                                              |
+| ------------- | ------------ | ------------------------------------------------------------------------------------------------- |
+| Animal cell   | **10–30 µm** | Supplied as "10–300 µm" — wrong, and an order out at the top                                      |
+| Plant cell    | 10–100 µm    | ✓                                                                                                 |
+| Nucleus       | ~5–10 µm     | **Omitted** from the supplied list, despite being the structure its own worked example asks about |
+| Mitochondrion | 1–2 µm       | ✓                                                                                                 |
+| Chloroplast   | 3–10 µm      | Added — needed for the comparison questions                                                       |
+| Ribosome      | ~20 nm       | ✓                                                                                                 |
+| Bacterium     | 0.5–5 µm     | Supplied as "1–2 µm" — too narrow. Belongs to `4.1.1.1` anyway                                    |
+
+### ⚠️ A worked example in the supplied research is wrong
+
+The source gave this method for orders of magnitude:
+
+> Plant cell `1 × 10⁻⁴ m`, chloroplast `5 × 10⁻⁶ m`. "Calculate the difference between exponents:
+> −4 − (−6) = 2. State that it is **2 orders of magnitude** (or approximately 100 times) larger."
+
+The ratio is `1 × 10⁻⁴ ÷ 5 × 10⁻⁶ = 20`. That is **1** order of magnitude, about 20×, not 100×.
+Subtracting exponents only works when the mantissas are comparable; here 1 against 5 is a fivefold
+swing, which is enough to flip the answer. The correct method is **divide first, then take the
+order of magnitude of the ratio**.
+
+Three consequences:
+
+1. This exact error becomes a misconception entry and a reject-list item in the `4.1.1.1` slice,
+   where orders of magnitude actually live. It is a good one — the shortcut is seductive and
+   usually works.
+2. It is a live demonstration of why D3 requires human review. The content was not obviously wrong;
+   it was confidently, plausibly, _specifically_ wrong, in the exact way that costs a student a
+   mark. That is the failure mode doc 04 §5 exists to catch.
+3. It was produced by the same class of model we intend to use for AI marking. The golden set in
+   doc 06 is not a formality.
+
+**Unverified claims not carried into the plan:** the source attributed question formats to specific
+papers (June 2018/2019/2021/2022). Those citations could not be verified and are not recorded as
+fact. It does not matter much — D5 forbids reproducing AQA questions anyway, so only the _formats_
+were ever usable, and those are corroborated.
 
 ---
 
@@ -430,10 +516,10 @@ simulation at the phase where it happens.
 Per D42, ~10 content questions. The practical adds a sub-bank of **5**, because practical questions
 are ≥15% of real exam marks and this slice now owns a required practical.
 
-**15 questions, ≈41 marks**, of which **14 marks (34%) are practical** — comfortably above the
-exam's ≥15%.
+**16 questions, ≈43 marks**, of which **14 marks (33%) are practical** — comfortably above the
+exam's ≥15%. Three of the questions are estimation (§4b), covering all three formats including area.
 
-### Content — 10 questions, ~27 marks
+### Content — 11 questions, ~29 marks
 
 | #   | Type            | Marks | Command  | AO      | Spec points               |
 | --- | --------------- | ----- | -------- | ------- | ------------------------- |
@@ -539,18 +625,31 @@ immersion · numerical aperture · the chemistry of iodine staining beyond "incr
 
 ---
 
-## 10. Open questions
+## 10. Settled, and what remains
 
-1. **Cheek cells.** You chose onion only, matching AQA's student sheet. The required practical as
-   written says "plant **and** animal cells", so onion alone does not fully satisfy it — the SoW
-   adds cheek cells with methylene blue for exactly this reason. Specimens are data, so adding one
-   later is cheap if we design for it now. Do you want the seam left open deliberately, and
-   recorded in the coverage report the same way the plasmid gap is?
-2. **Where the practical sits in the roadmap.** It does not fit inside Phase 3. My proposal is a
-   dedicated phase, with lessons 1–2, notes and content questions shipping first so `4.1.1.2` is
-   not blocked behind it.
-3. **Source material for `4.1.1.1`.** Now the next slice rather than a prior one. It unblocks the
-   deferred plasmid coverage and the bacterial cell diagram.
-4. **Estimation** (`bio-4112-est`) remains the vaguest thing in this spec extract and the hardest
-   to write a fair mark scheme for. Any past question that assesses it would be worth more than
-   anything else you could send.
+All four open questions from the previous draft are now closed:
+
+| Question                 | Resolution                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| Cheek cells?             | **No** (D48). Onion only, matching AQA's student sheet. Recorded below as a declared gap. |
+| Where the practical sits | **Phase 4b**, immediately after Learn. Costs the slice a month — see doc 08.              |
+| Source for `4.1.1.1`     | **Later.** Slice 2 stays open; the plasmid gap stays declared until it lands.             |
+| How to mark estimation   | **Answered** — tolerance bands with independent method marks, §4b, D49.                   |
+
+### The two declared gaps
+
+Neither is a bug, both are choices, and both are reported rather than hidden:
+
+1. **`bio-4112-func` is `partial`** — plasmids cannot be taught before bacteria exist. Unblocks
+   when slice 2 lands.
+2. **RP1 is satisfied by a plant cell only** — the practical as written says "plant **and** animal
+   cells". Specimens are data in the simulation, so adding cheek cells with methylene blue later
+   costs one cell field and one stain, not a rebuild. The coverage report shows `bio-rp-1` as
+   partial for as long as this stands.
+
+### Still genuinely open
+
+- **Whether the month is worth it.** Phase 4b pushes the vertical slice from March to April 2027
+  and cuts the final content window from four months to three, against a target where content was
+  already the binding constraint. Doc 08 records the lever to undo it if you change your mind:
+  move P4b after P7 and ship a static practical sheet in the meantime.
