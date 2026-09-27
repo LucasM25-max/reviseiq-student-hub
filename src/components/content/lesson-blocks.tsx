@@ -62,7 +62,11 @@ function BlockBody({ block }: { block: LessonBlock }) {
           <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--muted-foreground)] uppercase">
             Worked example
           </p>
-          <h4 className="mb-2 font-semibold">{block.title}</h4>
+          {/* h2, not h4: the lesson page owns the h1, and a worked example is a
+              top-level section under it. Jumping straight to h4 would leave a hole in
+              the outline a screen-reader user navigates by. Sized by class, not by
+              level. tests/lesson-blocks.test.ts checks the levels never skip. */}
+          <h2 className="mb-2 font-semibold">{block.title}</h2>
           <ol className="list-decimal space-y-2 pl-5 leading-7">
             {block.steps.map((step, index) => (
               <li key={index}>

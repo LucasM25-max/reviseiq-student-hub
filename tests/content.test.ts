@@ -260,16 +260,16 @@ describe("required practical 1", () => {
  * renders unstyled because the markdown renderer only themes `h3` and `h4`. Blocks and
  * note sections are the structure; headings inside a body are not.
  */
-describe("content bodies do not invent their own top-level headings", () => {
+describe("content bodies never declare a second h1", () => {
   const cases: [string, string, boolean][] = [
     ["plain prose", "Mitochondria are the site of aerobic respiration.", true],
+    ["an h2", "## A section heading\n\nProse under it.", true],
     ["an h3", "### A sub-heading\n\nProse under it.", true],
     ["an h4", "#### Deeper still\n\nProse.", true],
     ["a hash mid-sentence", "Use the # symbol to mean number.", true],
     ["a hash with no space", "#notaheading", true],
     ["an h1", "# A page heading\n\nProse.", false],
-    ["an h2", "## A section heading\n\nProse.", false],
-    ["an h2 further down", "Some prose.\n\n## A section heading\n\nMore prose.", false],
+    ["an h1 further down", "Some prose.\n\n# A page heading\n\nMore prose.", false],
   ];
 
   for (const [name, body, shouldPass] of cases) {
@@ -288,10 +288,10 @@ describe("content bodies do not invent their own top-level headings", () => {
   }
 
   it("explains itself when it rejects", () => {
-    const result = lessonBlockSchema.safeParse({ type: "prose", body: "## Nope" });
+    const result = lessonBlockSchema.safeParse({ type: "prose", body: "# Nope" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(JSON.stringify(result.error.issues)).toContain("new block or note section");
+      expect(JSON.stringify(result.error.issues)).toContain("the page owns the h1");
     }
   });
 
@@ -308,6 +308,6 @@ describe("content bodies do not invent their own top-level headings", () => {
     ];
 
     expect(bodies.length).toBeGreaterThan(10);
-    for (const body of bodies) expect(body).not.toMatch(/^#{1,2} /m);
+    for (const body of bodies) expect(body).not.toMatch(/^# /m);
   });
 });

@@ -194,6 +194,15 @@ the practical sheet.
   labelled A, B and C"_ over that diagram, so the figure printed its own answer. Lettering now
   **replaces** the name rather than appending to it, which makes the giveaway unreachable rather
   than merely fixed.
+- Lesson pages jumped from `h1` straight to `h3`/`h4`, leaving a hole in the outline a
+  screen-reader user navigates by. Bodies now author `##` as their top-level heading and the
+  renderer shifts the run to the depth its container sits at (D54).
+- `content:seed` pruned stale rows with `Promise.all`, under a comment promising "children
+  first". Concurrent cascades into the same join table are a deadlock waiting for a large
+  enough content set.
+- `npm run audit:prod` went red on four high-severity advisories reaching the production tree
+  through the `prisma` CLI that `@prisma/client` depends on. Pinned via `overrides` — see the
+  README.
 
 ---
 

@@ -169,7 +169,7 @@ export default async function PracticalPage({ params }: { params: Params }) {
         <h2 id="skills" className="mb-2 text-xl font-semibold tracking-tight">
           Skills assessed
         </h2>
-        <Markdown>
+        <Markdown headingOffset={1}>
           {`This practical assesses **${practical.atSkills.join("** and **")}**. AT 1 is measuring length accurately; AT 7 is using a microscope and producing labelled scientific drawings.`}
         </Markdown>
       </section>

@@ -28,17 +28,17 @@ export const lesson2: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-4112-func"],
-      body: "### The nucleus\n\nThe nucleus contains the cell's genetic material, DNA, arranged as chromosomes. Those genes carry the instructions for making proteins, and because the proteins a cell makes determine what the cell can do, the nucleus **controls the activities of the cell**.\n\nBoth halves of that are creditworthy: *contains the genetic material* and *controls the activities of the cell*. If a question is worth two marks, it usually wants both.",
+      body: "## The nucleus\n\nThe nucleus contains the cell's genetic material, DNA, arranged as chromosomes. Those genes carry the instructions for making proteins, and because the proteins a cell makes determine what the cell can do, the nucleus **controls the activities of the cell**.\n\nBoth halves of that are creditworthy: *contains the genetic material* and *controls the activities of the cell*. If a question is worth two marks, it usually wants both.",
     },
     {
       type: "prose",
       specPoints: ["bio-4112-func"],
-      body: "### The cell membrane\n\nEvery cell is surrounded by a cell membrane. It holds the cell together, and it **controls which substances enter and leave the cell**.\n\nThat control is the point. The membrane lets in the things the cell needs — oxygen, glucose — and lets out the things it must get rid of, such as carbon dioxide, while keeping everything else where it belongs. A cell that could not control its own boundary could not keep its internal conditions steady.",
+      body: "## The cell membrane\n\nEvery cell is surrounded by a cell membrane. It holds the cell together, and it **controls which substances enter and leave the cell**.\n\nThat control is the point. The membrane lets in the things the cell needs — oxygen, glucose — and lets out the things it must get rid of, such as carbon dioxide, while keeping everything else where it belongs. A cell that could not control its own boundary could not keep its internal conditions steady.",
     },
     {
       type: "prose",
       specPoints: ["bio-4112-func"],
-      body: "### Mitochondria\n\nMitochondria are the **site of aerobic respiration**. Aerobic respiration is the reaction that transfers energy from glucose so the cell can use it — for movement, for building new molecules, for keeping warm.\n\nSo the number of mitochondria in a cell tells you something about how much energy that cell needs. A muscle cell, which contracts repeatedly, is packed with them. A sperm cell has them concentrated in its middle section, right where the tail needs the energy.",
+      body: "## Mitochondria\n\nMitochondria are the **site of aerobic respiration**. Aerobic respiration is the reaction that transfers energy from glucose so the cell can use it — for movement, for building new molecules, for keeping warm.\n\nSo the number of mitochondria in a cell tells you something about how much energy that cell needs. A muscle cell, which contracts repeatedly, is packed with them. A sperm cell has them concentrated in its middle section, right where the tail needs the energy.",
     },
     {
       type: "misconception",
@@ -50,7 +50,7 @@ export const lesson2: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-4112-func"],
-      body: "### Chloroplasts\n\nChloroplasts are found in the plant cells that receive light, and they are the **site of photosynthesis**.\n\nThey contain a green pigment called **chlorophyll**, which absorbs the light energy that photosynthesis needs. That absorbed light is what drives the reaction that makes glucose from carbon dioxide and water.\n\nSo a palisade cell near the top surface of a leaf is full of chloroplasts, and a root hair cell has none at all — because there is no light underground for chlorophyll to absorb.",
+      body: "## Chloroplasts\n\nChloroplasts are found in the plant cells that receive light, and they are the **site of photosynthesis**.\n\nThey contain a green pigment called **chlorophyll**, which absorbs the light energy that photosynthesis needs. That absorbed light is what drives the reaction that makes glucose from carbon dioxide and water.\n\nSo a palisade cell near the top surface of a leaf is full of chloroplasts, and a root hair cell has none at all — because there is no light underground for chlorophyll to absorb.",
     },
     {
       type: "misconception",
@@ -107,7 +107,7 @@ export const lesson2: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-4112-est"],
-      body: "### When an estimate is the right tool\n\nYou will often be asked how big something is when nobody has handed you a ruler that fits. A nucleus cannot be measured with a millimetre scale, and a photograph of a cell rarely comes with every dimension marked.\n\nAn **estimate** is the right tool when:\n\n- you need a size quickly and an approximate value is good enough to answer the question;\n- you have one known length to compare against, such as a scale bar or a stated cell size;\n- you are checking whether an answer is sensible — is this nucleus about a fifth of the cell, or about the same size as it?\n\nIt is the **wrong** tool when a precise value matters: calibrating a graticule, or comparing two treatments in an experiment where the difference between them is small. There you measure.",
+      body: "## When an estimate is the right tool\n\nYou will often be asked how big something is when nobody has handed you a ruler that fits. A nucleus cannot be measured with a millimetre scale, and a photograph of a cell rarely comes with every dimension marked.\n\nAn **estimate** is the right tool when:\n\n- you need a size quickly and an approximate value is good enough to answer the question;\n- you have one known length to compare against, such as a scale bar or a stated cell size;\n- you are checking whether an answer is sensible — is this nucleus about a fifth of the cell, or about the same size as it?\n\nIt is the **wrong** tool when a precise value matters: calibrating a graticule, or comparing two treatments in an experiment where the difference between them is small. There you measure.",
     },
     {
       type: "widget",
@@ -139,7 +139,7 @@ export const lesson2: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-4112-est"],
-      body: "### Saying how much bigger\n\nWhen you compare sizes you can use symbols instead of words, and the specification expects you to read them:\n\n| Symbol | Means |\n| --- | --- |\n| $=$ | is equal to |\n| $<$ | is less than |\n| $\\ll$ | is much less than |\n| $>$ | is greater than |\n| $\\gg$ | is much greater than |\n| $\\propto$ | is proportional to |\n| $\\sim$ | is roughly |\n\nSo a ribosome at about 20 nm against a plant cell at up to 100 µm is written $\\text{ribosome} \\ll \\text{cell}$ — and the gap really is that big. 100 µm is 100 000 nm, which is five thousand times the width of a ribosome.\n\nSizes worth carrying in your head: an **animal cell** is about 10–30 µm across, a **plant cell** about 10–100 µm, a **nucleus** about 5–10 µm, a **mitochondrion** 1–2 µm, a **chloroplast** 3–10 µm, and a **ribosome** about 20 nm.",
+      body: "## Saying how much bigger\n\nWhen you compare sizes you can use symbols instead of words, and the specification expects you to read them:\n\n| Symbol | Means |\n| --- | --- |\n| $=$ | is equal to |\n| $<$ | is less than |\n| $\\ll$ | is much less than |\n| $>$ | is greater than |\n| $\\gg$ | is much greater than |\n| $\\propto$ | is proportional to |\n| $\\sim$ | is roughly |\n\nSo a ribosome at about 20 nm against a plant cell at up to 100 µm is written $\\text{ribosome} \\ll \\text{cell}$ — and the gap really is that big. 100 µm is 100 000 nm, which is five thousand times the width of a ribosome.\n\nSizes worth carrying in your head: an **animal cell** is about 10–30 µm across, a **plant cell** about 10–100 µm, a **nucleus** about 5–10 µm, a **mitochondrion** 1–2 µm, a **chloroplast** 3–10 µm, and a **ribosome** about 20 nm.",
     },
     {
       type: "summary",

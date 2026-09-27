@@ -21,16 +21,18 @@ const text = z.string().trim().min(1);
 /**
  * Markdown that will be rendered inside a page that already has its own headings.
  *
- * `#` and `##` are reserved for page structure: a lesson page owns its `<h1>`, and note
- * sections own their `<h2>`. A content body that opens with `## Something` would either
- * outrank or duplicate that, which breaks the document outline a screen-reader user
- * navigates by — and renders unstyled, because the renderer only themes `h3` and `h4`.
- * Authors should use a new block or a new note section instead; that is what blocks are
- * for. `###`/`####` are fine, since they nest correctly underneath.
+ * `#` is reserved for the page: every page owns exactly one `<h1>`, and a body that
+ * declares another one breaks the document outline a screen-reader user navigates by.
+ *
+ * `##` and deeper are fine and mean "a section inside this body". The author does not
+ * need to know how deep the body will sit — `Markdown` takes a `headingOffset` from its
+ * container and shifts the whole run so it lands at the right depth (a lesson block
+ * renders `##` as `<h2>`; a note section, already under its own `<h2>`, renders it as
+ * `<h3>`).
  */
 const markdown = text.refine(
-  (value) => !/^#{1,2} /m.test(value),
-  "use a new block or note section instead of a top-level '#'/'##' heading; '###' and deeper are fine",
+  (value) => !/^# /m.test(value),
+  "a content body must not contain a top-level '#' heading — the page owns the h1; use '##' and deeper",
 );
 
 const slug = z

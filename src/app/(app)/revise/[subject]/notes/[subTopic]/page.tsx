@@ -71,7 +71,9 @@ export default async function NotesPage({ params }: { params: Params }) {
           <h2 className="mt-8 mb-2 border-b border-border pb-2 text-xl font-semibold tracking-tight">
             {section.title}
           </h2>
-          <Markdown>{section.body}</Markdown>
+          {/* Each section already supplies its own h2 above, so a "##" in the body is
+              a sub-section and must render as h3. */}
+          <Markdown headingOffset={1}>{section.body}</Markdown>
         </section>
       ))}
 

@@ -25,13 +25,40 @@ import remarkMath from "remark-math";
 
 import { cn } from "@/lib/utils";
 
-const components = {
-  h3: (props: ComponentPropsWithoutRef<"h3">) => (
-    <h3 className="mt-6 mb-2 text-lg font-semibold text-[var(--foreground)]" {...props} />
-  ),
-  h4: (props: ComponentPropsWithoutRef<"h4">) => (
-    <h4 className="mt-5 mb-2 font-semibold text-[var(--foreground)]" {...props} />
-  ),
+/**
+ * Headings are rendered at a depth that depends on where the body sits.
+ *
+ * An author always writes `##` for "a section inside this body" and `###` for a
+ * sub-section, and does not have to know what the surrounding page looks like. The
+ * container supplies the offset:
+ *
+ *   - a lesson prose block sits under the page's `h1`, so offset 0 → `##` becomes `<h2>`
+ *   - a note section body already sits under the section's `h2`, so offset 1 → `<h3>`
+ *
+ * Without this, the same markdown produced a heading that skipped a level in one place
+ * and not the other, which leaves a hole in the outline a screen-reader user navigates
+ * by. The visual size follows the level the author wrote, not the level it lands at, so
+ * a `##` looks the same wherever it is used.
+ */
+const HEADING_CLASS: Record<number, string> = {
+  2: "mt-6 mb-2 text-lg font-semibold text-[var(--foreground)]",
+  3: "mt-5 mb-2 font-semibold text-[var(--foreground)]",
+  4: "mt-4 mb-1.5 font-semibold text-[var(--foreground)]",
+  5: "mt-4 mb-1.5 text-sm font-semibold text-[var(--foreground)]",
+  6: "mt-4 mb-1.5 text-sm font-semibold text-[var(--muted-foreground)]",
+};
+
+function headingRenderer(authored: number, offset: number) {
+  const level = Math.min(6, authored + offset);
+  const Tag = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
+  const Component = (props: ComponentPropsWithoutRef<"h2">) => (
+    <Tag className={HEADING_CLASS[authored] ?? HEADING_CLASS[6]} {...props} />
+  );
+  Component.displayName = `Heading${authored}to${level}`;
+  return Component;
+}
+
+const staticComponents = {
   p: (props: ComponentPropsWithoutRef<"p">) => <p className="my-3 leading-7" {...props} />,
   ul: (props: ComponentPropsWithoutRef<"ul">) => (
     <ul className="my-3 list-disc space-y-1 pl-6 leading-7" {...props} />
@@ -95,7 +122,28 @@ const components = {
   },
 };
 
-export function Markdown({ children, className }: { children: string; className?: string }) {
+export function Markdown({
+  children,
+  className,
+  headingOffset = 0,
+}: {
+  children: string;
+  className?: string;
+  /** How much deeper this body sits than the page's own `h1`. See headingRenderer. */
+  headingOffset?: number;
+}) {
+  const components = {
+    ...staticComponents,
+    // `#` is rejected by the content schema, but map it anyway so a stray one degrades
+    // to a sensible depth instead of emitting a second `<h1>` on the page.
+    h1: headingRenderer(2, headingOffset),
+    h2: headingRenderer(2, headingOffset),
+    h3: headingRenderer(3, headingOffset),
+    h4: headingRenderer(4, headingOffset),
+    h5: headingRenderer(5, headingOffset),
+    h6: headingRenderer(6, headingOffset),
+  };
+
   return (
     <div className={cn("text-[var(--foreground)]", className)}>
       <ReactMarkdown

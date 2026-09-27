@@ -31,7 +31,7 @@ export const lesson3: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-rp-1"],
-      body: "### What you need\n\nA light microscope with a ×10 eyepiece and ×4, ×10 and ×40 objective lenses. A slide and coverslip. An onion, forceps and a mounted needle. A pipette and water. Iodine solution. A paper towel. Pencil and paper for the drawing.\n\n**Eye protection goes on before the iodine comes out.** Iodine solution is an irritant, and it stains skin and clothes. Putting the goggles on after you have started is not a safety precaution, it is an apology.",
+      body: "## What you need\n\nA light microscope with a ×10 eyepiece and ×4, ×10 and ×40 objective lenses. A slide and coverslip. An onion, forceps and a mounted needle. A pipette and water. Iodine solution. A paper towel. Pencil and paper for the drawing.\n\n**Eye protection goes on before the iodine comes out.** Iodine solution is an irritant, and it stains skin and clothes. Putting the goggles on after you have started is not a safety precaution, it is an apology.",
     },
     {
       type: "widget",
@@ -47,7 +47,7 @@ export const lesson3: LessonInput = {
     {
       type: "prose",
       specPoints: ["bio-rp-1"],
-      body: '### What makes a biological drawing creditworthy\n\nThe marks for a drawing are not for artistic quality. They are for a specific set of conventions:\n\n- **Pencil, and single clear lines.** No sketchy, feathered, overlapping strokes.\n- **No shading and no colouring in.**\n- **Large enough to see** — a drawing should fill a good part of the space you are given.\n- **Draw what is actually there**, not what the textbook diagram shows. If you can only see cell walls and nuclei, draw cell walls and nuclei.\n- **Label lines are straight, drawn with a ruler, and do not cross each other.** Each one touches the structure it names.\n- **A magnification is written underneath.** The requirement says "a magnification scale must be included", and a drawing without one is incomplete.',
+      body: '## What makes a biological drawing creditworthy\n\nThe marks for a drawing are not for artistic quality. They are for a specific set of conventions:\n\n- **Pencil, and single clear lines.** No sketchy, feathered, overlapping strokes.\n- **No shading and no colouring in.**\n- **Large enough to see** — a drawing should fill a good part of the space you are given.\n- **Draw what is actually there**, not what the textbook diagram shows. If you can only see cell walls and nuclei, draw cell walls and nuclei.\n- **Label lines are straight, drawn with a ruler, and do not cross each other.** Each one touches the structure it names.\n- **A magnification is written underneath.** The requirement says "a magnification scale must be included", and a drawing without one is incomplete.',
     },
     {
       type: "misconception",
