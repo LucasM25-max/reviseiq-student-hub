@@ -46,11 +46,22 @@ function prismaBin() {
   return existsSync(local) ? local : "prisma";
 }
 
+/**
+ * Generating the client reads the schema and writes TypeScript. It never opens a
+ * connection — but prisma.config.ts resolves DATABASE_URL eagerly and throws when it is
+ * unset. That would make `npm install` fail on a fresh clone, before the developer has
+ * had any chance to write a .env. A placeholder keeps the config happy; nothing dials it.
+ */
+function datasourcePlaceholder() {
+  if (process.env.DATABASE_URL) return {};
+  return { DATABASE_URL: "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder" };
+}
+
 function run(env) {
   return spawnSync(prismaBin(), ["generate"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...datasourcePlaceholder(), ...env },
   });
 }
 
