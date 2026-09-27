@@ -919,6 +919,46 @@ console.log("\nBehind a reverse proxy");
     proxied,
   );
   check("onboarding saves from behind the proxy", redirected(saved), `${saved.status}`);
+
+  // The live preview renders the app in an iframe on another origin, so every request
+  // from it is cross-site. Browsers withhold SameSite=Lax cookies there: the page still
+  // paints, but the first server action is treated as signed out and bounces the student
+  // back to the step they were on. SameSite=None is the only value that survives, and it
+  // is ignored unless Secure rides along with it. Outside the sandbox, Lax must stay.
+  jar.clear();
+  const embedded = process.env.E2B_SANDBOX === "true";
+  const cookiePage = await get("/signup");
+  const cookieBody = new FormData();
+  for (const [key, value] of Object.entries(
+    actionFields(cookiePage.body, 'name="dateOfBirth"'),
+  ))
+    cookieBody.append(key, value);
+  for (const [key, value] of Object.entries({
+    name: "Cookie",
+    email: `smoke.cookie.${Date.now()}@example.test`,
+    password,
+    dateOfBirth: "2009-05-17",
+  }))
+    cookieBody.append(key, value);
+
+  const cookieResponse = await request("/signup", {
+    method: "POST",
+    body: cookieBody,
+    headers: proxied,
+  });
+  const session =
+    cookieResponse.headers.getSetCookie().find((c) => c.startsWith("authjs.session-token=")) ??
+    "";
+  const attributes = session.split(";").slice(1).join(";").trim() || "no session cookie";
+  const crossSite = /;\s*Secure/i.test(session) && /;\s*SameSite=None/i.test(session);
+
+  check(
+    embedded
+      ? "the session cookie is cross-site, so the iframe preview stays signed in"
+      : "the session cookie stays SameSite=Lax outside the sandbox",
+    embedded ? crossSite : /;\s*SameSite=Lax/i.test(session),
+    attributes,
+  );
 }
 
 console.log("\nPassword reset");
