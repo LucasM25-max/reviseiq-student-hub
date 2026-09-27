@@ -44,12 +44,13 @@ git clone https://github.com/LucasM25-max/reviseiq-student-hub.git
 cd reviseiq-student-hub
 npm install
 
-cp .env.example .env
-npx auth secret          # writes AUTH_SECRET into .env
-
-npm run db:setup         # start Postgres, apply migrations, seed the taxonomy
+npm run setup            # writes .env, starts Postgres, migrates, seeds
 npm run dev              # http://localhost:3000
 ```
+
+`npm run setup` is safe to re-run: an existing `.env` is left alone and a database that
+is already running is reused. The development database lives in `.devdb/`, so accounts
+and progress survive a restart. `npm run db:reset` throws it away and starts over.
 
 Sign up with any email address. Without `RESEND_API_KEY` nothing is actually emailed: the
 verification and reset links are printed to the server console, saved as HTML in `./.mail`, and

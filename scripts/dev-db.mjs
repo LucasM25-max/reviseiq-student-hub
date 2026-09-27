@@ -5,18 +5,26 @@
  * Runs a real PostgreSQL server (the same engine we use in production on Neon) from the
  * `embedded-postgres` package, so no Docker and no root access are required.
  *
- * The data directory lives outside the repository by default so a multi-megabyte binary
- * data dir is never picked up by git or by workspace snapshots.
+ * The data directory lives in .devdb inside the repository (gitignored). It used to
+ * live in /tmp, but sandboxes and CI runners clear /tmp between sessions, which silently
+ * destroyed every account and every bit of onboarding progress. Keeping it alongside the
+ * project means a restart resumes exactly where it left off.
+ *
+ * Set DEV_DB_DIR to override — point it at /tmp if you prefer a throwaway database.
  *
  *   node scripts/dev-db.mjs start    start and stay in the foreground (Ctrl-C to stop)
+ *   node scripts/dev-db.mjs start --detach
+ *                                    start, then exit, leaving the server running
  *   node scripts/dev-db.mjs stop     stop a server left running from a previous run
  *   node scripts/dev-db.mjs reset    delete the data directory entirely
  */
 import EmbeddedPostgres from "embedded-postgres";
+import { spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
+import { fileURLToPath } from "node:url";
 
-const DATA_DIR = process.env.DEV_DB_DIR ?? "/tmp/reviseiq-devdb";
+const DATA_DIR = process.env.DEV_DB_DIR ?? ".devdb";
 const PORT = Number(process.env.DEV_DB_PORT ?? 55432);
 const USER = "reviseiq";
 const PASSWORD = "reviseiq";
@@ -54,13 +62,50 @@ function createServer() {
   });
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Starts the server in a detached child and waits for it to accept connections.
+ *
+ * embedded-postgres stops the server when the process that started it exits, so a
+ * detached mode cannot simply start and return — it has to hand ownership to a process
+ * that outlives this command. The child runs the ordinary foreground path.
+ */
+async function startDetached() {
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "start"], {
+    detached: true,
+    stdio: "ignore",
+    env: process.env,
+  });
+  child.unref();
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (await portInUse(PORT)) {
+      console.log(
+        `[dev-db] ready — postgresql://${USER}:${PASSWORD}@127.0.0.1:${PORT}/${DATABASE}`,
+      );
+      return;
+    }
+    await sleep(500);
+  }
+
+  console.error(`[dev-db] timed out waiting for port ${PORT}`);
+  process.exit(1);
+}
+
 async function start() {
+  // Without --detach this process stays in the foreground so a supervisor has something
+  // to watch, which is what `npm run db:start` is for.
+  const detach = process.argv.includes("--detach");
+
   if (await portInUse(PORT)) {
     console.log(`[dev-db] already listening on ${PORT} — reusing it`);
-    // Stay alive so the caller's process supervision still has something to watch.
+    if (detach) return;
     await new Promise(() => {});
     return;
   }
+
+  if (detach) return startDetached();
 
   const pg = createServer();
   const firstRun = !existsSync(DATA_DIR);
@@ -121,7 +166,7 @@ async function reset() {
   console.log(`[dev-db] removed ${DATA_DIR}`);
 }
 
-const command = process.argv[2] ?? "start";
+const command = process.argv[2]?.startsWith("--") ? "start" : (process.argv[2] ?? "start");
 const commands = { start, stop, reset };
 
 if (!(command in commands)) {

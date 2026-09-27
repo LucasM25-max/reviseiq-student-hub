@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "node scripts/smoke.mjs",
+    "setup": "node scripts/dev-env.mjs && npm run db:setup",
+    "env:setup": "node scripts/dev-env.mjs",
     "db:start": "node scripts/dev-db.mjs start",
     "db:stop": "node scripts/dev-db.mjs stop",
     "db:reset": "node scripts/dev-db.mjs reset",
@@ -24,7 +26,7 @@
     "db:status": "node scripts/db-migrate.mjs --status",
     "db:seed": "tsx prisma/seed.ts",
     "db:generate": "node scripts/prisma-generate.mjs",
-    "db:setup": "npm run db:start && npm run db:migrate && npm run db:seed",
+    "db:setup": "npm run db:start -- --detach && npm run db:migrate && npm run db:seed",
     "audit:prod": "npm audit --omit=dev",
     "postinstall": "node scripts/prisma-generate.mjs"
   },
