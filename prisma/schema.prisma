@@ -230,6 +230,8 @@ model Subject {
   order       Int
   topics      Topic[]
   enrolments  SubjectEnrolment[]
+  practicals  Practical[]
+  questions   Question[]
 }
 
 enum SubjectCode {
@@ -257,7 +259,7 @@ model Topic {
   @@index([subjectId, order])
 }
 
-/// Populated with content in Phase 3. Progressive sub-topic RAG (D19) depends on it.
+/// Progressive sub-topic RAG (D19) depends on it. Content hangs off it from Phase 3.
 model SubTopic {
   id      String @id
   topicId String
@@ -266,8 +268,13 @@ model SubTopic {
   title   String
   order   Int
 
-  topic      Topic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  ragRatings RagRating[]
+  topic        Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  ragRatings   RagRating[]
+  specPoints   SpecPoint[]
+  lessons      Lesson[]
+  noteSections NoteSection[]
+  blurtPrompts BlurtPrompt[]
+  questions    Question[]
 
   @@unique([topicId, code])
   @@index([topicId, order])
@@ -366,4 +373,207 @@ model AvailabilitySlot {
 
   @@unique([userId, weekday])
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Content (Phase 3) — seeded from /content, never edited by hand or by the app.
+// docs/plan/03-data-model.md §2, docs/plan/04-content-pipeline.md
+// ---------------------------------------------------------------------------
+
+enum Tier {
+  BOTH
+  FOUNDATION
+  HIGHER
+}
+
+enum Coverage {
+  FULL
+  PARTIAL
+}
+
+enum QuestionType {
+  MCQ
+  SHORT
+  CALCULATION
+  EXTENDED
+  PRACTICAL
+  DATA_RESPONSE
+}
+
+enum AO {
+  AO1
+  AO2
+  AO3
+}
+
+model SpecPoint {
+  id           String   @id
+  subTopicId   String
+  /// AQA specification code. Not unique: one code can yield several assessable points.
+  code         String
+  statement    String
+  tier         Tier     @default(BOTH)
+  mathsSkills  String[]
+  wsSkills     String[]
+  practicalIds String[]
+  /// PARTIAL when something in the statement is knowingly deferred (D50 reporting).
+  coverage     Coverage @default(FULL)
+  /// Slice ids that must land before `coverage` can become FULL.
+  blockedBy    String[]
+  order        Int
+
+  subTopic        SubTopic               @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  questionLinks   QuestionSpecPoint[]
+  lessonBlockRefs LessonBlockSpecPoint[]
+
+  @@index([subTopicId, order])
+}
+
+model Lesson {
+  id         String @id
+  subTopicId String
+  slug       String
+  title      String
+  summary    String
+  order      Int
+  estMinutes Int
+  tier       Tier   @default(BOTH)
+  /// Typed block array, zod-validated before it is written here.
+  blocks     Json
+  version    Int    @default(1)
+
+  subTopic   SubTopic               @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  blockRefs  LessonBlockSpecPoint[]
+
+  @@unique([subTopicId, slug])
+  @@index([subTopicId, order])
+}
+
+/// Flattened join so coverage can be queried in SQL rather than by walking `Lesson.blocks`.
+model LessonBlockSpecPoint {
+  id          String @id
+  lessonId    String
+  specPointId String
+  blockIndex  Int
+  /// Recap blocks never satisfy coverage on their own (D39).
+  recap       Boolean @default(false)
+
+  lesson    Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  specPoint SpecPoint @relation(fields: [specPointId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, blockIndex, specPointId])
+  @@index([specPointId])
+}
+
+model NoteSection {
+  id             String   @id
+  subTopicId     String
+  /// Becomes the #anchor Today deep-links to. Permanent once shipped.
+  slug           String
+  title          String
+  body           String
+  tier           Tier     @default(BOTH)
+  specPointCodes String[]
+  order          Int
+
+  subTopic SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([subTopicId, slug])
+  @@index([subTopicId, order])
+}
+
+model Practical {
+  id          String   @id
+  subjectId   String
+  number      Int
+  title       String
+  requirement String
+  aim         String
+  apparatus   String[]
+  /// [{ n, text, why? }] — the method, in the exam's language.
+  method      Json
+  safety      String[]
+  /// The fault table (D50): authored as data in Phase 3, rendered by the engine in Phase 4b.
+  faults      Json
+  subTopicIds String[]
+  atSkills    String[]
+  coverage    Coverage @default(FULL)
+  blockedBy   String[]
+
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, number])
+}
+
+model BlurtPrompt {
+  id             String @id
+  subTopicId     String
+  prompt         String
+  /// [{ id, idea, aliases[], essential }]
+  expectedPoints Json
+  tier           Tier   @default(BOTH)
+  estMinutes     Int    @default(4)
+  order          Int
+
+  subTopic SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+
+  @@index([subTopicId, order])
+}
+
+model Question {
+  id                String       @id
+  subjectId         String
+  primarySubTopicId String
+  type              QuestionType
+  tier              Tier         @default(BOTH)
+  paper             Int
+  marks             Int
+  commandWord       String
+  ao                AO
+  difficulty        Int
+  stem              String
+  /// { diagramId?, dataTable?, figureCaption? }
+  assets            Json?
+  /// MCQ options: [{ key, text }]
+  options           Json?
+  /// MCQ/objective answer key — marked deterministically, never by the model.
+  correctKey        String?
+  estSeconds        Int
+  version           Int          @default(1)
+  retired           Boolean      @default(false)
+
+  subject    Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subTopic   SubTopic            @relation(fields: [primarySubTopicId], references: [id], onDelete: Cascade)
+  markScheme MarkScheme?
+  specPoints QuestionSpecPoint[]
+
+  @@index([subjectId, tier, paper])
+  @@index([primarySubTopicId, tier])
+}
+
+model QuestionSpecPoint {
+  questionId  String
+  specPointId String
+  weight      Float  @default(1)
+
+  question  Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  specPoint SpecPoint @relation(fields: [specPointId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, specPointId])
+  @@index([specPointId])
+}
+
+model MarkScheme {
+  questionId String @id
+  /// [{ id, text, marks, alternatives[], reject[] }] — atomic, independently awardable.
+  points     Json
+  guidance   String?
+  ecfRules   String?
+  /// Shown to the student after marking. NEVER sent to the marker (doc 04).
+  modelAnswer String?
+  /// D49: { accept:{min,max}, unit, significantFigures?, methodPoints[], ecf }.
+  /// Present ⇒ marked deterministically in-app, never by the model.
+  numericAnswer Json?
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }

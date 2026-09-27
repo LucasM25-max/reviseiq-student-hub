@@ -6,6 +6,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      "@content": path.resolve(import.meta.dirname, "./content"),
       // `server-only` throws by design outside a React Server Component. Under Vitest we
       // *are* on the server, so it is replaced with a no-op rather than weakening the
       // guard in application code.

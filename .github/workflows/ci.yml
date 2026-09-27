@@ -56,6 +56,28 @@ jobs:
       - name: Seed the curriculum taxonomy
         run: npm run db:seed
 
+      # Fast, database-free gate: schemas, cross-references and coverage. Runs before
+      # the slower steps so a broken content file fails in seconds rather than minutes.
+      - name: Validate content
+        run: npm run content:validate
+
+      - name: Seed content into Postgres
+        run: npm run content:seed
+
+      # /content is the source of truth and Postgres is a rebuildable query layer, so
+      # seeding twice must be a no-op. If the second run reports stale rows removed or
+      # differing counts, the seeder is not idempotent and a deploy would churn content.
+      - name: Prove the content seed is idempotent
+        run: |
+          npm run content:seed > /tmp/seed-1.txt
+          npm run content:seed > /tmp/seed-2.txt
+          diff <(grep '^\[content:seed\]' /tmp/seed-1.txt) \
+               <(grep '^\[content:seed\]' /tmp/seed-2.txt)
+          if grep -q 'stale row' /tmp/seed-2.txt; then
+            echo "Second seed removed rows — the seeder is not idempotent." >&2
+            exit 1
+          fi
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -84,3 +106,17 @@ jobs:
 
       - name: Audit production dependencies
         run: npm run audit:prod
+
+      # Phase 3 exit criterion, stated plainly as its own step so it is visible in the
+      # CI log rather than buried in the test run: deliberately broken content must fail.
+      # The fixtures live in tests/fixtures/broken-content/ and are broken on purpose.
+      - name: Prove broken content is rejected
+        run: |
+          for fixture in schema references gates; do
+            if npx tsx tests/fixtures/broken-content/validate-entry.ts "$fixture" \
+                 > /dev/null 2>&1; then
+              echo "Broken content fixture '$fixture' was accepted by the validator." >&2
+              exit 1
+            fi
+            echo "✓ '$fixture' fixture correctly rejected"
+          done

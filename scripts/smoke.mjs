@@ -442,6 +442,105 @@ console.log("\nThe app shell");
   );
 }
 
+console.log("\nContent — Biology 4.1.1 (Phase 3)");
+{
+  // Everything below is server-rendered from the seeded content tables, so these checks
+  // prove the whole pipeline end to end: /content → content:seed → Postgres → page.
+  // They run with JavaScript disabled, like the rest of the smoke suite.
+  const learn = await get("/learn");
+  // React separates adjacent JSX expressions with an empty comment, so "{code} {title}"
+  // serialises as `4.1.1<!-- --> <!-- -->Cell structure`. Assert on the parts.
+  check(
+    "Learn links the sub-topics that have lessons",
+    learn.body.includes("/learn/biology/4-1-1") &&
+      learn.body.includes("Cell structure") &&
+      learn.body.includes("3 lessons"),
+  );
+
+  const index = await get("/learn/biology/4-1-1");
+  check("the sub-topic index renders", index.status === 200, `${index.status}`);
+  check(
+    "it lists all three lessons",
+    ["Inside animal and plant cells", "Why each part is there", "Required practical"].every(
+      (title) => index.body.includes(title),
+    ),
+  );
+
+  const lesson = await get("/learn/biology/4-1-1/inside-animal-and-plant-cells");
+  check("lesson 1 renders", lesson.status === 200, `${lesson.status}`);
+  check("markdown is rendered, not printed raw", !lesson.body.includes("**Most animal cells"));
+  check("bold markdown became real markup", lesson.body.includes("<strong"));
+  check(
+    "the hand-built SVG diagram is inlined",
+    lesson.body.includes("<svg") && lesson.body.includes("Permanent vacuole"),
+  );
+  check("the diagram is labelled for screen readers", lesson.body.includes('role="img"'));
+  check(
+    "the KS3 recap is collapsible rather than hidden",
+    lesson.body.includes("Recap from earlier study"),
+  );
+  check(
+    "a check block reveals its answer without JavaScript",
+    lesson.body.includes("Show the answer"),
+  );
+  check("widget blocks are honest about not being built yet", lesson.body.includes("Phase 4"));
+
+  const maths = await get("/learn/biology/4-1-1/required-practical-microscopy");
+  check("lesson 3 renders", maths.status === 200, `${maths.status}`);
+  check("KaTeX typesets the magnification formula", maths.body.includes("katex"));
+  check("the worked example reaches the right answer", maths.body.includes("120 ÷ 0.24 = 500"));
+
+  const notes = await get("/revise/biology/notes/4-1-1");
+  check("revision notes render", notes.status === 200, `${notes.status}`);
+  check(
+    "every permanent anchor slug is present",
+    [
+      "animal-cells",
+      "plant-cells",
+      "functions",
+      "estimating",
+      "practical",
+      "drawing-rules",
+      "exam-technique",
+    ].every((slug) => notes.body.includes(`id="${slug}"`)),
+  );
+  check("markdown tables become real tables", notes.body.includes("<table"));
+
+  const practical = await get("/revise/biology/practicals/rp-1");
+  check(
+    "the required practical sheet renders",
+    practical.status === 200,
+    `${practical.status}`,
+  );
+  check(
+    "all twenty method steps are listed",
+    practical.body.includes("magnification of your drawing"),
+  );
+  check(
+    "the fault table is shown as sources of error",
+    practical.body.includes("Sources of error") &&
+      practical.body.includes("bubbles are trapped") &&
+      // The one fatal fault is flagged as ending the run.
+      practical.body.includes("Ends the experiment"),
+  );
+  check(
+    "the declared gap is shown to the student, not just the report",
+    practical.body.includes("Partly covered so far"),
+  );
+
+  for (const [path, why] of [
+    ["/learn/biology/9-9-9", "an unknown sub-topic"],
+    ["/learn/biology/4-1-1/no-such-lesson", "an unknown lesson"],
+    ["/revise/biology/notes/9-9-9", "notes for an unknown sub-topic"],
+    ["/revise/biology/practicals/rp-99", "a practical that does not exist"],
+    ["/revise/biology/practicals/not-a-practical", "a malformed practical slug"],
+    ["/learn/geography/4-1-1", "a subject that does not exist"],
+  ]) {
+    const missing = await get(path);
+    check(`404 for ${why}`, missing.status === 404, `${missing.status}`);
+  }
+}
+
 console.log("\nEmail verification");
 {
   const page = await get("/verify-email");
