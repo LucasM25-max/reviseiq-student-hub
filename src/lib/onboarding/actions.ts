@@ -9,6 +9,7 @@ import type {
   TierChoice,
   YearGroup,
 } from "@/generated/prisma/enums";
+import { signOut } from "@/lib/auth/auth";
 import { getCurrentUser } from "@/lib/auth/session";
 import { estimatedExamDates } from "@/lib/curriculum/exam-dates";
 import { prisma } from "@/lib/db/prisma";
@@ -31,8 +32,24 @@ import { safeRedirectPath } from "@/lib/url";
  * A session that expires mid-onboarding should not strand the student behind a message
  * they can do nothing with. Send them to log in, then straight back to the step they
  * were on with their answers still on screen.
+ *
+ * The token is discarded on the way out. Sessions are stateless JWTs, so one can keep
+ * decoding long after the account it names has gone — deleted, or lost with a rebuilt
+ * database. Every layer that only reads the cookie then insists the student is signed
+ * in while every layer that checks the database disagrees, and they bounce between the
+ * two with nothing they can do about it. Clearing it makes the next login a clean one.
+ *
+ * A server action is one of the few places this is possible at all: server components
+ * cannot write cookies, and the proxy has no database to know it should.
  */
-function signInAgain(step: string): never {
+async function signInAgain(step: string): Promise<never> {
+  try {
+    await signOut({ redirect: false });
+  } catch (error) {
+    // Best effort. Never let tidying up stop the student reaching the login page.
+    console.error("[onboarding] could not clear a stale session", error);
+  }
+
   redirect(`/login?next=${encodeURIComponent(step)}`);
 }
 
@@ -57,7 +74,7 @@ export async function saveSubjectsAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) signInAgain("/onboarding/subjects");
+  if (!user) return signInAgain("/onboarding/subjects");
 
   // A browser can legitimately submit the same checkbox twice (a duplicated node after
   // a hydration recovery, an autofill extension). Deduplicate rather than reading it as
@@ -127,7 +144,7 @@ export async function saveSetupAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) signInAgain("/onboarding/setup");
+  if (!user) return signInAgain("/onboarding/setup");
 
   const parsed = setupSchema.safeParse({
     yearGroup: text(formData, "yearGroup"),
@@ -198,7 +215,7 @@ function isRagValue(value: string | undefined): value is RagValue {
 
 export async function saveRagAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) signInAgain("/onboarding/rag");
+  if (!user) return signInAgain("/onboarding/rag");
 
   const topics = await prisma.topic.findMany({
     where: { subject: { enrolments: { some: { userId: user.id, active: true } } } },
@@ -261,7 +278,7 @@ export async function saveAvailabilityAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) signInAgain("/onboarding/availability");
+  if (!user) return signInAgain("/onboarding/availability");
 
   const slots: { weekday: number; minutes: number }[] = [];
 

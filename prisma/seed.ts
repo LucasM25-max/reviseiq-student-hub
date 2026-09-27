@@ -22,6 +22,7 @@ if (!connectionString) {
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 /** Development-only demo credentials. Documented in the README. */
+const DEMO_USER_ID = "demo-student-reviseiq-fixed-id";
 const DEMO_EMAIL = "demo@reviseiq.app";
 const DEMO_PASSWORD = "revise-with-me-2026";
 
@@ -104,6 +105,14 @@ async function seedDemoStudent() {
   const user = await prisma.user.upsert({
     where: { email: DEMO_EMAIL },
     create: {
+      /**
+       * Pinned, not generated. The session token stores the user id, so letting the
+       * database mint a fresh cuid on each reseed silently invalidates every token
+       * issued before it: the student stays "signed in" — the JWT decodes — but every
+       * lookup misses and they are bounced to the login page they just came from.
+       * A stable id means a session survives the database being rebuilt under it.
+       */
+      id: DEMO_USER_ID,
       email: DEMO_EMAIL,
       name: "Demo Student",
       passwordHash,
