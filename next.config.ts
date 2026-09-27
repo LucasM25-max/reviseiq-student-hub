@@ -28,7 +28,15 @@ const proxiedOrigins = [
   "127.0.0.1:3000",
 ].filter(Boolean);
 
-const isProduction = process.env.NODE_ENV === "production";
+/**
+ * Whether to forbid being framed by anyone else.
+ *
+ * This cannot key off `NODE_ENV`, because `next start` sets it to "production" — so a
+ * preview sandbox, which is exactly where the app *must* be frameable, looked identical
+ * to the live site and sent a header that blanks the preview pane. Key off a real
+ * deployment instead: Vercel sets `VERCEL`, and `FRAME_GUARD=on` forces it anywhere else.
+ */
+const frameGuard = Boolean(process.env.VERCEL) || process.env.FRAME_GUARD === "on";
 
 const nextConfig: NextConfig = {
   // Dev is often served through a proxy on a different host (sandboxes, tunnels,
@@ -55,10 +63,10 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
           },
-          // Nothing in ReviseIQ should be framed by a third party in production.
+          // Nothing in ReviseIQ should be framed by a third party once deployed.
           // `frame-ancestors` supersedes X-Frame-Options and, unlike it, can be
-          // relaxed for development so preview panes can embed the app.
-          ...(isProduction
+          // relaxed off-deployment so preview panes can embed the app.
+          ...(frameGuard
             ? [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'" }]
             : []),
         ],

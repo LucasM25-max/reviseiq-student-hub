@@ -52,13 +52,24 @@ export default function ErrorBoundary({
             Reference: {error.digest}
           </p>
         ) : null}
+        {/*
+          When the connection is what failed, `reset()` only re-renders the same tree
+          against the same unreachable server — and if the page went stale against a
+          newer deploy, it can never succeed. A full reload fetches the page again and
+          recovers from both, so it leads. Retrying in place stays available for the
+          case where it really was a blip.
+        */}
         <div className="mt-6 flex justify-center gap-3">
-          <Button onClick={reset}>Try again</Button>
           {offline ? (
-            <Button variant="secondary" onClick={() => window.location.reload()}>
-              Reload the page
-            </Button>
-          ) : null}
+            <>
+              <Button onClick={() => window.location.reload()}>Reload the page</Button>
+              <Button variant="secondary" onClick={reset}>
+                Try again
+              </Button>
+            </>
+          ) : (
+            <Button onClick={reset}>Try again</Button>
+          )}
         </div>
       </main>
     </div>

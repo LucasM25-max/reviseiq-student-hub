@@ -838,6 +838,31 @@ console.log("\nSign out and back in");
 
 // The preview pane, tunnels and any reverse proxy put a different host in front of the
 // server. Both of these used to break every form in that setup.
+console.log("\nSecurity headers");
+{
+  const response = await fetch(new URL("/", BASE), { redirect: "manual" });
+  const headers = response.headers;
+
+  check("nosniff is set", headers.get("x-content-type-options") === "nosniff");
+  check(
+    "the referrer policy is set",
+    headers.get("referrer-policy") === "strict-origin-when-cross-origin",
+  );
+  check(
+    "the permissions policy locks down camera, mic and location",
+    (headers.get("permissions-policy") ?? "").includes("camera=()"),
+  );
+
+  // `next start` sets NODE_ENV=production, so a frame guard keyed off that would fire
+  // in a preview sandbox and blank the pane it is being previewed in. The guard is
+  // keyed off a real deployment instead; here, it must be absent.
+  check(
+    "the preview stays embeddable — no frame guard off-deployment",
+    !(headers.get("content-security-policy") ?? "").includes("frame-ancestors"),
+    headers.get("content-security-policy") ?? "none",
+  );
+}
+
 console.log("\nBehind a reverse proxy");
 {
   const publicHost = "3000-smoketest.e2b.app";
