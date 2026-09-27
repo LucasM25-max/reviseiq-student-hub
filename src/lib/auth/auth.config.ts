@@ -34,8 +34,23 @@ export const googleConfigured = Boolean(googleId && googleSecret);
  */
 const embeddedPreview = process.env.E2B_SANDBOX === "true";
 
-/** `SameSite=None` is meaningless to a browser without `Secure`. */
-const crossSiteOptions = { httpOnly: true, sameSite: "none", path: "/", secure: true } as const;
+/**
+ * `SameSite=None` is meaningless to a browser without `Secure`.
+ *
+ * `Partitioned` (CHIPS) is what makes it work at all in a modern browser. Chrome now
+ * blocks third-party cookies by default, and a `SameSite=None` cookie in a cross-site
+ * iframe is precisely what "third-party cookie" means — without this attribute the
+ * browser refuses to *store* it, so signing in appears to succeed and the very next
+ * request arrives anonymous. Partitioning scopes the cookie to the embedding site,
+ * which is exactly the isolation the browser wants, so it is kept and sent.
+ */
+const crossSiteOptions = {
+  httpOnly: true,
+  sameSite: "none",
+  path: "/",
+  secure: true,
+  partitioned: true,
+} as const;
 
 const embeddedPreviewCookies: NextAuthConfig["cookies"] = {
   sessionToken: { name: "authjs.session-token", options: crossSiteOptions },

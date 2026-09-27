@@ -37,6 +37,9 @@ describe("auth cookie policy", () => {
       expect(cookie.options.secure, `${name} secure`).toBe(true);
       expect(cookie.options.httpOnly, `${name} httpOnly`).toBe(true);
       expect(cookie.options.path, `${name} path`).toBe("/");
+      // CHIPS. Without it a browser that blocks third-party cookies refuses to store
+      // the cookie at all, so signing in "works" and the next request is anonymous.
+      expect(cookie.options.partitioned, `${name} partitioned`).toBe(true);
     }
   });
 

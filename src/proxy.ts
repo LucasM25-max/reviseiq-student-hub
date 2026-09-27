@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { authConfig } from "@/lib/auth/auth.config";
 import { publicOrigin } from "@/lib/http/forwarded";
+import { trace } from "@/lib/diagnostics";
 
 /**
  * Coarse route protection.
@@ -62,6 +63,23 @@ const proxy = auth((request) => {
    * themselves and reply with a redirect the client understands, so let them answer.
    */
   const isServerAction = request.method === "POST" && request.headers.has("next-action");
+
+  trace("proxy", {
+    method: request.method,
+    path: pathname,
+    action: isServerAction,
+    // Names only — a cookie value is a credential.
+    cookies:
+      request.cookies
+        .getAll()
+        .map((c) => c.name)
+        .join(",") || "none",
+    signedIn,
+    host: request.headers.get("host"),
+    forwardedHost: request.headers.get("x-forwarded-host"),
+    forwardedProto: request.headers.get("x-forwarded-proto"),
+    origin: request.headers.get("origin"),
+  });
 
   if (isProtected && !signedIn && !isServerAction) {
     const url = publicUrl(request, "/login");

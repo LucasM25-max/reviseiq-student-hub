@@ -13,6 +13,7 @@ import { signOut } from "@/lib/auth/auth";
 import { getCurrentUser } from "@/lib/auth/session";
 import { estimatedExamDates } from "@/lib/curriculum/exam-dates";
 import { prisma } from "@/lib/db/prisma";
+import { trace } from "@/lib/diagnostics";
 import { formError, text, textList, type FormState } from "@/lib/forms";
 import { furthestOf } from "@/lib/onboarding/steps";
 import { safeRedirectPath } from "@/lib/url";
@@ -74,6 +75,10 @@ export async function saveSubjectsAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
+  trace("subjects", {
+    resolvedUser: user?.id ?? "NONE — this is what sends the student to /login",
+    picked: formData.getAll("subjectId").join(",") || "none",
+  });
   if (!user) return signInAgain("/onboarding/subjects");
 
   // A browser can legitimately submit the same checkbox twice (a duplicated node after
