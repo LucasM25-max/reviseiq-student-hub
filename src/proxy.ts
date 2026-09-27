@@ -1,5 +1,5 @@
 import NextAuth from "next-auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { authConfig } from "@/lib/auth/auth.config";
 
@@ -34,6 +34,27 @@ const PROTECTED = [
   "/welcome",
 ];
 
+/**
+ * Builds a redirect target on the origin the browser actually used.
+ *
+ * `request.nextUrl.origin` is the origin the server is bound to, which behind any
+ * reverse proxy — preview sandboxes, tunnels, a load balancer — is not the origin the
+ * browser is talking to. Redirecting there sends the student to `localhost` on their
+ * own machine. `x-forwarded-host` is the proxy's statement of the public host, so
+ * prefer it, then the Host header, and only then fall back.
+ */
+function publicUrl(request: NextRequest, path: string): URL {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? request.headers.get("host");
+  if (!host) return new URL(path, request.nextUrl.origin);
+
+  const proto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    request.nextUrl.protocol.replace(":", "");
+
+  return new URL(path, `${proto}://${host}`);
+}
+
 const proxy = auth((request) => {
   const { pathname, search } = request.nextUrl;
   const signedIn = Boolean(request.auth?.user);
@@ -42,14 +63,14 @@ const proxy = auth((request) => {
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (isProtected && !signedIn) {
-    const url = new URL("/login", request.nextUrl.origin);
+    const url = publicUrl(request, "/login");
     // Preserve where they were heading so the deep links in Today survive a login.
     url.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(url);
   }
 
   if (isGuestOnly && signedIn) {
-    return NextResponse.redirect(new URL("/today", request.nextUrl.origin));
+    return NextResponse.redirect(publicUrl(request, "/today"));
   }
 
   return NextResponse.next();

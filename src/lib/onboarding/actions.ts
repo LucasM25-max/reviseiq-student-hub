@@ -27,7 +27,26 @@ import { safeRedirectPath } from "@/lib/url";
  * the onboarding forms verbatim instead of maintaining a second copy of each one.
  */
 
-const NOT_SIGNED_IN = formError("Your session has expired. Log in and try again.");
+/**
+ * A session that expires mid-onboarding should not strand the student behind a message
+ * they can do nothing with. Send them to log in, then straight back to the step they
+ * were on with their answers still on screen.
+ */
+function signInAgain(step: string): never {
+  redirect(`/login?next=${encodeURIComponent(step)}`);
+}
+
+/**
+ * Turns an unexpected database failure into something the student can act on.
+ *
+ * Without this an infrastructure hiccup surfaces as an opaque "an error occurred" with
+ * no indication of whether their work was saved. The underlying error is still logged
+ * for us; the student gets a sentence and a way forward.
+ */
+function saveFailed(step: string, error: unknown): FormState {
+  console.error(`[onboarding] ${step} failed to save`, error);
+  return formError("We couldn't save that just now. Check your connection and try again.");
+}
 
 // ---------------------------------------------------------------------------
 // Step 1 — subjects
@@ -38,9 +57,12 @@ export async function saveSubjectsAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return NOT_SIGNED_IN;
+  if (!user) signInAgain("/onboarding/subjects");
 
-  const chosen = textList(formData, "subjectId");
+  // A browser can legitimately submit the same checkbox twice (a duplicated node after
+  // a hydration recovery, an autofill extension). Deduplicate rather than reading it as
+  // "you picked a subject that doesn't exist".
+  const chosen = [...new Set(textList(formData, "subjectId"))];
 
   if (chosen.length === 0) {
     return formError("Pick at least one subject — you can add the others later.");
@@ -52,28 +74,38 @@ export async function saveSubjectsAction(
   });
 
   if (subjects.length !== chosen.length) {
-    return formError("One of those subjects isn't available. Refresh and try again.");
+    const missing = chosen.filter((id) => !subjects.some((subject) => subject.id === id));
+    return formError(
+      `We couldn't find ${missing.length === 1 ? "one of the subjects" : "some of the subjects"} you picked. Reload the page and try again.`,
+    );
   }
 
-  await prisma.$transaction([
-    // Deselecting is a soft deactivation: ratings, attempts and history survive in case
-    // the student changes their mind or picks the subject back up next term.
-    prisma.subjectEnrolment.updateMany({
-      where: { userId: user.id, subjectId: { notIn: chosen } },
-      data: { active: false },
-    }),
-    ...subjects.map((subject) =>
-      prisma.subjectEnrolment.upsert({
-        where: { userId_subjectId: { userId: user.id, subjectId: subject.id } },
-        create: { userId: user.id, subjectId: subject.id, active: true },
-        update: { active: true },
+  try {
+    await prisma.$transaction([
+      // Deselecting is a soft deactivation: ratings, attempts and history survive in
+      // case the student changes their mind or picks the subject back up next term.
+      prisma.subjectEnrolment.updateMany({
+        where: { userId: user.id, subjectId: { notIn: chosen } },
+        data: { active: false },
       }),
-    ),
-    prisma.studentProfile.update({
-      where: { userId: user.id },
-      data: { onboardingStep: furthestOf(user.onboardingStep, "SETUP") },
-    }),
-  ]);
+      ...subjects.map((subject) =>
+        prisma.subjectEnrolment.upsert({
+          where: { userId_subjectId: { userId: user.id, subjectId: subject.id } },
+          create: { userId: user.id, subjectId: subject.id, active: true },
+          update: { active: true },
+        }),
+      ),
+      // upsert, not update: a profile can be missing if the row was never created,
+      // and losing onboarding to a foreign-key error helps nobody.
+      prisma.studentProfile.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, onboardingStep: furthestOf(user.onboardingStep, "SETUP") },
+        update: { onboardingStep: furthestOf(user.onboardingStep, "SETUP") },
+      }),
+    ]);
+  } catch (error) {
+    return saveFailed("subjects", error);
+  }
 
   redirect(safeRedirectPath(text(formData, "returnTo"), "/onboarding/setup"));
 }
@@ -95,7 +127,7 @@ export async function saveSetupAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return NOT_SIGNED_IN;
+  if (!user) signInAgain("/onboarding/setup");
 
   const parsed = setupSchema.safeParse({
     yearGroup: text(formData, "yearGroup"),
@@ -166,7 +198,7 @@ function isRagValue(value: string | undefined): value is RagValue {
 
 export async function saveRagAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return NOT_SIGNED_IN;
+  if (!user) signInAgain("/onboarding/rag");
 
   const topics = await prisma.topic.findMany({
     where: { subject: { enrolments: { some: { userId: user.id, active: true } } } },
@@ -229,7 +261,7 @@ export async function saveAvailabilityAction(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return NOT_SIGNED_IN;
+  if (!user) signInAgain("/onboarding/availability");
 
   const slots: { weekday: number; minutes: number }[] = [];
 

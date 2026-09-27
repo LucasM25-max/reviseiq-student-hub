@@ -183,7 +183,9 @@ export function RagForm({
             </div>
           </div>
 
-          <SubmitButton size="lg" disabled={!complete} pendingLabel="Saving…">
+          {/* Shows what's left, but never blocks the submit: if the counter and the
+              form ever disagree, the server decides and says which topics are missing. */}
+          <SubmitButton size="lg" pendingLabel="Saving…">
             {complete ? submitLabel : `${total - rated} left`}
           </SubmitButton>
         </div>

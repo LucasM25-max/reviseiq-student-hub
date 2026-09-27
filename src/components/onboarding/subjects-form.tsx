@@ -32,13 +32,24 @@ export function SubjectsForm({
   submitLabel?: string;
 }) {
   const [state, action] = useActionState(saveSubjectsAction, idleFormState);
+
+  /**
+   * The checkboxes are deliberately uncontrolled.
+   *
+   * What gets submitted is whatever the browser has checked — never a mirror of React
+   * state. If hydration is slow, partial or broken, the worst case is that the styling
+   * stops updating; the form still submits exactly what the student ticked. A
+   * `checked` prop here would let React quietly force boxes back off and send an empty
+   * selection, which looks to the student like "I chose three subjects and it says I
+   * chose none".
+   */
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
 
-  function toggle(id: string) {
+  function toggle(id: string, isChecked: boolean) {
     setSelected((previous) => {
       const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (isChecked) next.add(id);
+      else next.delete(id);
       return next;
     });
   }
@@ -69,8 +80,8 @@ export function SubjectsForm({
                   type="checkbox"
                   name="subjectId"
                   value={subject.id}
-                  checked={isSelected}
-                  onChange={() => toggle(subject.id)}
+                  defaultChecked={initialSelected.includes(subject.id)}
+                  onChange={(event) => toggle(subject.id, event.currentTarget.checked)}
                   className="sr-only"
                 />
 
@@ -109,7 +120,9 @@ export function SubjectsForm({
             ? "Nothing selected yet"
             : `${selected.size} subject${selected.size === 1 ? "" : "s"} selected`}
         </p>
-        <SubmitButton size="lg" disabled={selected.size === 0} pendingLabel="Saving…">
+        {/* Never gated on client state: if the counter is wrong, the student must
+            still be able to submit and let the server have the final say. */}
+        <SubmitButton size="lg" pendingLabel="Saving…">
           {submitLabel}
         </SubmitButton>
       </div>

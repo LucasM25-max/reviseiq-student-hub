@@ -110,7 +110,7 @@ function actionFields(html, needle) {
   return fields;
 }
 
-async function submit(path, html, values, needle = null) {
+async function submit(path, html, values, needle = null, headers = {}) {
   const body = new FormData();
   for (const [key, value] of Object.entries(actionFields(html, needle)))
     body.append(key, value);
@@ -118,7 +118,7 @@ async function submit(path, html, values, needle = null) {
     if (Array.isArray(value)) value.forEach((item) => body.append(key, item));
     else body.append(key, value);
   }
-  const response = await request(path, { method: "POST", body });
+  const response = await request(path, { method: "POST", body, headers });
   return {
     status: response.status,
     location: response.headers.get("location"),
@@ -523,6 +523,57 @@ console.log("\nSign out and back in");
 
   const back = await get("/today");
   check("back on Today", back.body.includes("Your plan for today"));
+}
+
+// The preview pane, tunnels and any reverse proxy put a different host in front of the
+// server. Both of these used to break every form in that setup.
+console.log("\nBehind a reverse proxy");
+{
+  const publicHost = "3000-smoketest.e2b.app";
+
+  const redirect = await fetch(new URL("/today", BASE), {
+    redirect: "manual",
+    headers: {
+      host: "localhost:3000",
+      "x-forwarded-host": publicHost,
+      "x-forwarded-proto": "https",
+    },
+  });
+  const location = redirect.headers.get("location") ?? "";
+  check(
+    "protected routes redirect to the browser's own host",
+    location.startsWith(`https://${publicHost}/login`),
+    location,
+  );
+
+  // Origin is the public host, the server only knows its own: Next treats a mismatch
+  // as CSRF and rejects the action unless the origin is explicitly allowed.
+  jar.clear();
+  const proxied = { origin: `https://${publicHost}` };
+  const proxyEmail = `smoke.proxy.${Date.now()}@example.test`;
+  const page = await get("/signup");
+  const signUp = await submit(
+    "/signup",
+    page.body,
+    { name: "Proxy", email: proxyEmail, password, dateOfBirth: "2009-05-17" },
+    'name="dateOfBirth"',
+    proxied,
+  );
+  check(
+    "server actions work when Origin is the public host",
+    redirected(signUp),
+    `${signUp.status}`,
+  );
+
+  const subjects = await get("/onboarding/subjects");
+  const saved = await submit(
+    "/onboarding/subjects",
+    subjects.body,
+    { subjectId: ["aqa-biology", "aqa-chemistry"] },
+    'name="subjectId"',
+    proxied,
+  );
+  check("onboarding saves from behind the proxy", redirected(saved), `${saved.status}`);
 }
 
 console.log("\nPassword reset");
