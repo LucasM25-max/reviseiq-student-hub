@@ -2,22 +2,22 @@
 
 ## Stack
 
-| Layer             | Choice                                                                  | Why                                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Framework         | **Next.js 15+, App Router, React 19, TypeScript strict**                | Server Components keep content rendering cheap; Server Actions remove most API boilerplate; one deploy target.            |
-| Styling           | **Tailwind CSS + shadcn/ui** (Radix primitives)                         | Accessible components we own the source of, not a black-box library.                                                      |
-| Auth              | **Auth.js v5** (`next-auth@beta`) + `@auth/prisma-adapter`              | Google OAuth and credentials in one system, with full control over the user table.                                        |
-| ORM / DB          | **Prisma + PostgreSQL**                                                 | The Today engine is relational: it joins attempts × spec points × RAG × FSRS state. This is exactly what Postgres is for. |
-| DB host           | **Neon**, EU (London `eu-west-2` if available, else `eu-central-1`)     | Serverless Postgres, branching for preview deploys, UK/EU data residency for children's data.                             |
-| AI                | **Google Gemini `gemini-3.8-flash`** via `@google/genai`                | D8. Structured output, 1M context, cheap enough for per-answer marking.                                                   |
-| Spaced repetition | **`ts-fsrs`** (FSRS-6, MIT)                                             | D12.                                                                                                                      |
-| Email             | **Resend** + React Email                                                | Verification, password reset, revision reminders.                                                                         |
-| Validation        | **Zod** everywhere — forms, server actions, AI responses, content files | One schema definition reused as TS types.                                                                                 |
-| Maths/chemistry   | **KaTeX** via `rehype-katex`                                            | Equations and chemical notation in content.                                                                               |
-| Content           | **MDX + TypeScript modules in-repo**, compiled and seeded to Postgres   | Git-versioned source of truth, relational query layer. See doc 04.                                                        |
-| Testing           | **Vitest** (unit) + **Playwright** (E2E)                                | The Today engine and FSRS wrapper are pure functions — heavily unit-tested.                                               |
-| Errors/analytics  | **Sentry** + **Vercel Analytics**                                       | Plus a bespoke `AiUsage` cost table.                                                                                      |
-| Hosting           | **Vercel**                                                              | D1. `GEMINI_API_KEY` as an encrypted env var (D8).                                                                        |
+| Layer             | Choice                                                                        | Why                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Framework         | **Next.js 15+, App Router, React 19, TypeScript strict**                      | Server Components keep content rendering cheap; Server Actions remove most API boilerplate; one deploy target.            |
+| Styling           | **Tailwind CSS + shadcn/ui** (Radix primitives)                               | Accessible components we own the source of, not a black-box library.                                                      |
+| Auth              | **Auth.js v5** (`next-auth@beta`) + `@auth/prisma-adapter`                    | Google OAuth and credentials in one system, with full control over the user table.                                        |
+| ORM / DB          | **Prisma + PostgreSQL**                                                       | The Today engine is relational: it joins attempts × spec points × RAG × FSRS state. This is exactly what Postgres is for. |
+| DB host           | **Neon**, EU (London `eu-west-2` if available, else `eu-central-1`)           | Serverless Postgres, branching for preview deploys, UK/EU data residency for children's data.                             |
+| AI                | **Google Gemini `gemini-3.8-flash`** via `@google/genai`                      | D8. Structured output, 1M context, cheap enough for per-answer marking.                                                   |
+| Spaced repetition | **`ts-fsrs`** (FSRS-6, MIT)                                                   | D12.                                                                                                                      |
+| Email             | **Resend** + React Email                                                      | Verification, password reset, revision reminders.                                                                         |
+| Validation        | **Zod** everywhere — forms, server actions, AI responses, content files       | One schema definition reused as TS types.                                                                                 |
+| Maths/chemistry   | **KaTeX** via `rehype-katex`                                                  | Equations and chemical notation in content.                                                                               |
+| Content           | **TypeScript modules in-repo with Markdown bodies** (D51), seeded to Postgres | Git-versioned source of truth, relational query layer. See doc 04.                                                        |
+| Testing           | **Vitest** (unit) + **Playwright** (E2E)                                      | The Today engine and FSRS wrapper are pure functions — heavily unit-tested.                                               |
+| Errors/analytics  | **Sentry** + **Vercel Analytics**                                             | Plus a bespoke `AiUsage` cost table.                                                                                      |
+| Hosting           | **Vercel**                                                                    | D1. `GEMINI_API_KEY` as an encrypted env var (D8).                                                                        |
 
 ### Deliberate non-choices
 
@@ -134,14 +134,15 @@ Everything else (RAG updates, task completion, settings, availability) uses **Se
   mastery/                 mastery estimation from attempts
   content/                 zod schemas, loaders, validators
 /content
+  index.ts                 the barrel the loader reads; nothing else imports content files
   biology/
     taxonomy.ts            topics → sub-topics → spec points
-    lessons/               *.mdx
-    notes/                 *.mdx
-    questions/             *.ts (question + mark scheme pairs)
-    practicals/            *.mdx
-    blurts/                *.ts
-    formulae.ts
+    4.1.1.2/               one directory per sub-topic, named for its spec code
+      lessons/             *.ts — typed block arrays, Markdown inside the blocks
+      notes.ts             sectioned, with the stable slugs Today deep-links to
+      questions.ts         question + mark scheme pairs
+      blurt.ts
+    practicals/            *.ts — one per required practical, incl. its fault table (D50)
   chemistry/ physics/      same shape
 /prisma
   schema.prisma

@@ -127,6 +127,21 @@ applied by `scripts/db-migrate.mjs`, which maintains the same `_prisma_migration
 reads. This keeps schema changes reviewable and avoids depending on Prisma's engine downloads.
 `prisma/schema.prisma` remains the source of truth for the generated client.
 
+### A note on the two dependency overrides
+
+`package.json` pins `deepmerge-ts` and `mysql2` through `overrides`. Neither is a direct
+dependency. `@prisma/client` depends on the `prisma` CLI, which pulls in `@prisma/config`
+(→ `deepmerge-ts`) and every database driver Prisma supports (→ `mysql2`), so both land in the
+**production** tree even though this app only ever talks to Postgres and never runs the CLI in
+production. When advisories were published against the versions Prisma 7.10.0 resolves,
+`npm run audit:prod` went red with four high-severity findings and no upgrade available —
+`npm audit fix --force` wanted to downgrade to Prisma 6.
+
+The overrides pull both to their patched releases. `npm audit` reports zero vulnerabilities, and
+`npm run db:generate` plus `npm run db:status` both confirm `@prisma/config` still loads
+`prisma.config.ts` correctly across the `deepmerge-ts` 7 → 8 major bump. Remove them once Prisma
+ships a release that resolves the patched versions itself.
+
 ---
 
 ## The plan

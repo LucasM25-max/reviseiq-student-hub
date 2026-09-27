@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { analyseCoverage, GATES } from "@/lib/content/coverage";
 import { DIAGRAMS, getDiagram } from "@/lib/content/diagrams";
 import { loadContent } from "@/lib/content/registry";
-import { WIDGETS } from "@/lib/content/widgets";
+import { lessonBlockSchema, noteSectionSchema } from "@/lib/content/schema";
+import { WIDGETS, widgetIds } from "@/lib/content/widgets";
 
 /**
  * The real content, held to the standard it will be marked against.
@@ -157,9 +158,37 @@ describe("registries", () => {
     }
   });
 
-  it("gives every widget a unique id", () => {
-    const ids = WIDGETS.map((widget) => widget.id);
+  it("gives every widget a unique, kebab-case id", () => {
+    const ids = widgetIds();
     expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids)
+      expect(id, `${id} is not kebab-case`).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+
+  it("registers exactly the widgets the roadmap promises, and says which phase builds each", () => {
+    // Renaming a widget id silently breaks every lesson block that references it, and
+    // `plannedPhase` is what the renderer shows the student instead of a broken block.
+    expect(widgetIds().sort()).toEqual([
+      "card-sort",
+      "comparison-table",
+      "label-the-diagram",
+      "microscope-practical",
+      "scale-explorer",
+    ]);
+
+    for (const widget of WIDGETS) {
+      // Nothing is built yet, so every widget must still name the phase that builds it.
+      expect(widget.plannedPhase, `${widget.id} has no planned phase`).toMatch(/^Phase /);
+      expect(
+        widget.description.length,
+        `${widget.id} needs a real description`,
+      ).toBeGreaterThan(30);
+    }
+
+    // The practical simulation is the one widget that belongs to Phase 4b (D45).
+    expect(WIDGETS.find((widget) => widget.id === "microscope-practical")?.plannedPhase).toBe(
+      "Phase 4b",
+    );
   });
 
   it("resolves every diagram referenced by a question", () => {
@@ -220,5 +249,65 @@ describe("required practical 1", () => {
   it("is declared partial, because it covers plant cells only (D48)", () => {
     expect(practical!.coverage).toBe("PARTIAL");
     expect(practical!.blockedBy.join(" ")).toMatch(/onion/i);
+  });
+});
+
+/**
+ * Heading discipline in content bodies.
+ *
+ * Lesson and note pages own their own `<h1>`/`<h2>`. A body that starts its own
+ * top-level heading breaks the document outline a screen-reader user navigates by, and
+ * renders unstyled because the markdown renderer only themes `h3` and `h4`. Blocks and
+ * note sections are the structure; headings inside a body are not.
+ */
+describe("content bodies do not invent their own top-level headings", () => {
+  const cases: [string, string, boolean][] = [
+    ["plain prose", "Mitochondria are the site of aerobic respiration.", true],
+    ["an h3", "### A sub-heading\n\nProse under it.", true],
+    ["an h4", "#### Deeper still\n\nProse.", true],
+    ["a hash mid-sentence", "Use the # symbol to mean number.", true],
+    ["a hash with no space", "#notaheading", true],
+    ["an h1", "# A page heading\n\nProse.", false],
+    ["an h2", "## A section heading\n\nProse.", false],
+    ["an h2 further down", "Some prose.\n\n## A section heading\n\nMore prose.", false],
+  ];
+
+  for (const [name, body, shouldPass] of cases) {
+    it(`${shouldPass ? "accepts" : "rejects"} ${name}`, () => {
+      const block = lessonBlockSchema.safeParse({ type: "prose", body });
+      expect(block.success).toBe(shouldPass);
+
+      const section = noteSectionSchema.safeParse({
+        id: "bio-x-n1",
+        slug: "a-slug",
+        title: "A title",
+        body,
+      });
+      expect(section.success).toBe(shouldPass);
+    });
+  }
+
+  it("explains itself when it rejects", () => {
+    const result = lessonBlockSchema.safeParse({ type: "prose", body: "## Nope" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(JSON.stringify(result.error.issues)).toContain("new block or note section");
+    }
+  });
+
+  it("holds for every body in the shipped content", () => {
+    const bodies = [
+      ...content.lessons.flatMap((lesson) =>
+        lesson.blocks.flatMap((block) =>
+          block.type === "prose" || block.type === "keyIdea" || block.type === "summary"
+            ? [block.body]
+            : [],
+        ),
+      ),
+      ...content.notes.flatMap((page) => page.sections.map((section) => section.body)),
+    ];
+
+    expect(bodies.length).toBeGreaterThan(10);
+    for (const body of bodies) expect(body).not.toMatch(/^#{1,2} /m);
   });
 });

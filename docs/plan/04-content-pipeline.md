@@ -82,13 +82,25 @@ to from Today.
 
 | Artefact      | File                                         | Notes                                                                                                |
 | ------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Lesson        | `/content/<subject>/lessons/<subtopic>.mdx`  | Typed block array (doc 01 §3). Every block carries spec point codes.                                 |
-| Notes         | `/content/<subject>/notes/<subtopic>.mdx`    | Sectioned with stable slugs — the slugs become Today's `#anchor` deep links, so they must not churn. |
-| Questions     | `/content/<subject>/questions/<subtopic>.ts` | Question + structured mark scheme, co-located.                                                       |
-| Blurt prompts | `/content/<subject>/blurts/<subtopic>.ts`    | 3–6 guided prompts with `expectedPoints`.                                                            |
-| Practicals    | `/content/<subject>/practicals/rp-<n>.mdx`   | One per required practical.                                                                          |
-| Formulae      | `/content/<subject>/formulae.ts`             | Includes the `givenInExam` flag.                                                                     |
-| Diagrams      | `/components/diagrams/<subject>/<Name>.tsx`  | Hand-built SVG (D18) + a text alternative.                                                           |
+| Lesson        | `/content/<subject>/<subtopic>/lessons/*.ts` | Typed block array (doc 01 §3). Every block carries spec point codes.                                 |
+| Notes         | `/content/<subject>/<subtopic>/notes.ts`     | Sectioned with stable slugs — the slugs become Today's `#anchor` deep links, so they must not churn. |
+| Questions     | `/content/<subject>/<subtopic>/questions.ts` | Question + structured mark scheme, co-located.                                                       |
+| Blurt prompts | `/content/<subject>/<subtopic>/blurt.ts`     | 3–6 guided prompts with `expectedPoints`.                                                            |
+| Practicals    | `/content/<subject>/practicals/rp-<n>-*.ts`  | One per required practical, including its fault table (D50).                                         |
+| Formulae      | `/content/<subject>/formulae.ts`             | Includes the `givenInExam` flag. _Not yet needed — 4.1.1.2 has no given formulae._                   |
+| Diagrams      | `/src/components/content/diagrams/*.tsx`     | Hand-built SVG (D18), registered in `/src/lib/content/diagrams.ts` with a text alternative.          |
+
+Content is grouped **by sub-topic, not by kind**: everything for `4.1.1.2` lives under one
+directory. Authoring a topic means touching one folder, and reviewing one means reading one folder,
+which is the unit content actually gets written and reviewed in. `/content/index.ts` is the only
+barrel — the loader imports that and nothing else reaches into the tree, so adding a sub-topic is
+one import line and the validator immediately covers it.
+
+Diagrams are the exception: they are components, not data, so they live in `/src`. The registry in
+`/src/lib/content/diagrams.ts` is deliberately **JSX-free data**, which is what lets
+`content:validate` check every `diagramId` and `diagramLetters` reference from a plain Node script
+without pulling React in. A unit test asserts the registry and the component table list exactly the
+same diagrams, so one cannot exist without the other.
 
 ### Question and mark scheme shape (D5 — original questions)
 

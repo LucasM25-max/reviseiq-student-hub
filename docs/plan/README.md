@@ -84,6 +84,9 @@ it through and add the replacement rather than deleting — the history matters.
 | D48 | RP1 specimens            | **Onion only**, matching AQA's student sheet                                                               | Confirmed 27 Sep 2026. The practical says "plant **and** animal cells", so `bio-rp-1` is reported partial.                                               |
 | D49 | Numeric marking          | Questions may carry a **tolerance band** plus independent **method marks**, marked **deterministically**   | Estimation cannot be marked against one value. A range check is a comparison, not a language judgement — the model would cost more and be less reliable. |
 | D50 | Practical data vs engine | A practical's **fault table is content data** (P3); the **simulation that renders it is an engine** (P4b)  | Lets the practical question bank ship months before the simulation, while still sharing one source so they cannot drift.                                 |
+| D51 | Content markup           | **Markdown + KaTeX, not MDX.** No `rehype-raw`; interactivity only via typed `widget`/`diagram` blocks     | MDX allows arbitrary JSX, which zod cannot validate and Postgres cannot store inert. Keeps a lesson body data rather than code.                          |
+| D52 | Diagram lettering        | Lettering a structure **replaces** its name on the figure; it never appends to it                          | q03 asks "name the structures labelled A, B and C" — a figure reading "A — Cell wall" prints its own answer. Replacing makes the giveaway unreachable.   |
+| D53 | Validator layering       | `content:validate` runs **schema → cross-reference → coverage** and stops at the first layer that fails    | References are meaningless until parsing succeeds. Costs one thing: proving all three layers needs three broken fixtures, not one.                       |
 
 ---
 

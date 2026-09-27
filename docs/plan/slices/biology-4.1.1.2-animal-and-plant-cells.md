@@ -516,10 +516,13 @@ simulation at the phase where it happens.
 Per D42, ~10 content questions. The practical adds a sub-bank of **5**, because practical questions
 are ≥15% of real exam marks and this slice now owns a required practical.
 
-**16 questions, ≈43 marks**, of which **14 marks (33%) are practical** — comfortably above the
+**17 questions, 45 marks**, of which **14 marks (31.1%) are practical** — comfortably above the
 exam's ≥15%. Three of the questions are estimation (§4b), covering all three formats including area.
 
-### Content — 11 questions, ~29 marks
+> Counts verified against `npm run content:report`, which is the authority. If this line and the
+> report disagree, the report is right and this line is stale.
+
+### Content — 12 questions, 31 marks
 
 | #   | Type            | Marks | Command  | AO      | Spec points               |
 | --- | --------------- | ----- | -------- | ------- | ------------------------- |
@@ -598,19 +601,24 @@ immersion · numerical aperture · the chemistry of iodine staining beyond "incr
 
 ## 9. Acceptance criteria
 
-**Content**
+**Content** — all but the last two are done and enforced by CI (Phase 3).
 
-- [ ] `npm run content:validate` passes; no dangling diagram, widget or question IDs
-- [ ] `npm run content:report` shows `bio-4112-func` as **partial**, blocked by `4.1.1.1` — not green
-- [ ] 15 questions, ≈41 marks, AO split within ±5% of 40/40/20, ≥5 types, ≥1 extended
-- [ ] Practical questions ≥15% of the slice's marks
-- [ ] Every mark point atomic and independently awardable
-- [ ] All 12 misconceptions appear in a lesson block, distractor or reject list
-- [ ] No excluded term appears in any lesson, note or required mark point
+- [x] `npm run content:validate` passes; no dangling diagram, widget or question IDs
+- [x] `npm run content:report` shows `bio-4112-func` as **partial**, blocked by `4.1.1.1` — not green
+- [x] 17 questions, 45 marks, AO split within ±5% of 40/40/20, ≥5 types, ≥1 extended
+      — actual AO split is exactly 40/40/20 and all six question types are used
+- [x] Practical questions ≥15% of the slice's marks — 14 of 45, 31.1%
+- [x] Every mark point atomic and independently awardable — a test asserts every mark point
+      is worth exactly 1, so a 3-mark question has three separately awardable points
+- [x] All 12 misconceptions appear in a lesson block, distractor or reject list
+- [x] No excluded term appears in any lesson, note or required mark point —
+      `tests/content-editorial.test.ts` encodes §8 as executable invariants
 - [ ] Marker awards **zero** to a one-sided answer on a _compare_ question — explicit golden-set case
-- [ ] AI marking golden set ≥60 answers, ≥90% within ±1 mark
+      _(needs the marker: Phase 5)_
+- [ ] AI marking golden set ≥60 answers, ≥90% within ±1 mark _(Phase 5)_
 
-**Practical simulation**
+**Practical simulation** — Phase 4b. The fault table and the method are already authored as
+content data (D50) and tested; everything below needs the engine that consumes them.
 
 - [ ] All 20 AQA student-sheet steps are performable, in order, and out of order
 - [ ] Every fault in §4.4 fires on its trigger and **only** on its trigger, proven by test

@@ -262,26 +262,44 @@ async function seed(content: LoadedContent): Promise<void> {
 
   // --- Prune ----------------------------------------------------------------
   // /content is the source of truth, so anything here that is not in /content was
-  // deleted or renamed upstream and must not linger. Order matters: children first,
-  // though the cascades would cope.
-  const pruned = await Promise.all([
-    prisma.question.deleteMany({
-      where: { id: { notIn: content.questions.map((question) => question.id) } },
-    }),
-    prisma.lesson.deleteMany({
-      where: { id: { notIn: content.lessons.map((lesson) => lesson.id) } },
-    }),
-    prisma.noteSection.deleteMany({ where: { id: { notIn: noteSectionIds } } }),
-    prisma.blurtPrompt.deleteMany({
-      where: { id: { notIn: content.blurtPrompts.map((prompt) => prompt.id) } },
-    }),
-    prisma.practical.deleteMany({
-      where: { id: { notIn: content.practicals.map((practical) => practical.id) } },
-    }),
-    prisma.specPoint.deleteMany({ where: { id: { notIn: specPointIds } } }),
-    prisma.subTopic.deleteMany({ where: { id: { notIn: subTopicIds } } }),
-  ]);
-  counts.deleted = pruned.reduce((sum, result) => sum + result.count, 0);
+  // deleted or renamed upstream and must not linger.
+  //
+  // These run **in sequence, children first**, deliberately. An earlier version used
+  // `Promise.all`, which fires them concurrently: deleting a SpecPoint cascades into
+  // QuestionSpecPoint at the same moment deleting a Question cascades into the same
+  // table, which is a deadlock waiting for a large enough content set. Sequential
+  // deletes cost milliseconds on a set this size and cannot interleave.
+  const questionIds = content.questions.map((question) => question.id);
+  const lessonIds = content.lessons.map((lesson) => lesson.id);
+  const blurtPromptIds = content.blurtPrompts.map((prompt) => prompt.id);
+  const practicalIds = content.practicals.map((practical) => practical.id);
+
+  const prunes: [string, () => Promise<{ count: number }>][] = [
+    ["question", () => prisma.question.deleteMany({ where: { id: { notIn: questionIds } } })],
+    ["lesson", () => prisma.lesson.deleteMany({ where: { id: { notIn: lessonIds } } })],
+    [
+      "noteSection",
+      () => prisma.noteSection.deleteMany({ where: { id: { notIn: noteSectionIds } } }),
+    ],
+    [
+      "blurtPrompt",
+      () => prisma.blurtPrompt.deleteMany({ where: { id: { notIn: blurtPromptIds } } }),
+    ],
+    [
+      "practical",
+      () => prisma.practical.deleteMany({ where: { id: { notIn: practicalIds } } }),
+    ],
+    [
+      "specPoint",
+      () => prisma.specPoint.deleteMany({ where: { id: { notIn: specPointIds } } }),
+    ],
+    ["subTopic", () => prisma.subTopic.deleteMany({ where: { id: { notIn: subTopicIds } } })],
+  ];
+
+  for (const [, run] of prunes) {
+    const result = await run();
+    counts.deleted += result.count;
+  }
 }
 
 async function main(): Promise<void> {

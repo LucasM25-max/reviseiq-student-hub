@@ -18,6 +18,21 @@ import { z } from "zod";
 /** Non-empty, trimmed prose. Catches the "" and "   " that slip through hand-authoring. */
 const text = z.string().trim().min(1);
 
+/**
+ * Markdown that will be rendered inside a page that already has its own headings.
+ *
+ * `#` and `##` are reserved for page structure: a lesson page owns its `<h1>`, and note
+ * sections own their `<h2>`. A content body that opens with `## Something` would either
+ * outrank or duplicate that, which breaks the document outline a screen-reader user
+ * navigates by — and renders unstyled, because the renderer only themes `h3` and `h4`.
+ * Authors should use a new block or a new note section instead; that is what blocks are
+ * for. `###`/`####` are fine, since they nest correctly underneath.
+ */
+const markdown = text.refine(
+  (value) => !/^#{1,2} /m.test(value),
+  "use a new block or note section instead of a top-level '#'/'##' heading; '###' and deeper are fine",
+);
+
 const slug = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be a lowercase kebab-case slug");
@@ -97,9 +112,9 @@ const checkOptionSchema = z.object({
 });
 
 export const lessonBlockSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("prose"), body: text, ...blockBase }),
-  z.object({ type: z.literal("keyIdea"), body: text, ...blockBase }),
-  z.object({ type: z.literal("definition"), term: text, body: text, ...blockBase }),
+  z.object({ type: z.literal("prose"), body: markdown, ...blockBase }),
+  z.object({ type: z.literal("keyIdea"), body: markdown, ...blockBase }),
+  z.object({ type: z.literal("definition"), term: text, body: markdown, ...blockBase }),
   z.object({
     type: z.literal("example"),
     title: text,
@@ -133,7 +148,7 @@ export const lessonBlockSchema = z.discriminatedUnion("type", [
     correction: text,
     ...blockBase,
   }),
-  z.object({ type: z.literal("summary"), body: text, ...blockBase }),
+  z.object({ type: z.literal("summary"), body: markdown, ...blockBase }),
 ]);
 
 export const lessonSchema = z
@@ -197,7 +212,7 @@ export const noteSectionSchema = z.object({
   /** Becomes the #anchor Today deep-links to. Permanent once shipped. */
   slug,
   title: text,
-  body: text,
+  body: markdown,
   tier: tierSchema.default("BOTH"),
   specPointCodes: z.array(z.string()).default([]),
 });

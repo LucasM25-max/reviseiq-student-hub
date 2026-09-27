@@ -338,3 +338,121 @@ describe("notes anchors are stable deep-link targets", () => {
     ]);
   });
 });
+
+/**
+ * §8's misconception table, enforced row by row.
+ *
+ * The slice lists twelve misconceptions and, for each, where it is handled. A tick in
+ * the acceptance criteria that nothing checks is just a claim, so each row below is a
+ * predicate over the real content. If someone deletes the "powerhouse" reject list or
+ * softens the chloroplast distractor, the specific row fails and names itself.
+ */
+describe("all twelve §8 misconceptions are handled somewhere a student will meet them", () => {
+  const misconceptionClaims = content.lessons
+    .flatMap((lesson) => lesson.blocks)
+    .filter((block) => block.type === "misconception")
+    .map((block) => `${block.claim} ${block.correction}`.toLowerCase());
+
+  const distractors = content.questions
+    .flatMap((question) => question.options ?? [])
+    .map((option) => option.text.toLowerCase());
+
+  const rejects = content.questions
+    .flatMap((question) => question.markScheme.points)
+    .flatMap((point) => point.reject ?? [])
+    .map((text) => text.toLowerCase());
+
+  const faultIds = content.practicals.flatMap((practical) =>
+    practical.faults.map((fault) => fault.id),
+  );
+
+  const anyMatches = (haystack: string[], needle: string) =>
+    haystack.some((entry) => entry.includes(needle));
+
+  /** [row, what must be true] — mirrors the table in the slice doc, in order. */
+  const rows: [string, () => boolean][] = [
+    [
+      "1 — every plant cell has chloroplasts",
+      () =>
+        anyMatches(misconceptionClaims, "every plant cell has chloroplasts") &&
+        anyMatches(distractors, "all plant cells contain chloroplasts") &&
+        anyMatches(rejects, "all plant cells have chloroplasts"),
+    ],
+    [
+      "2 — the cell wall controls what enters and leaves",
+      () => anyMatches(misconceptionClaims, "cell wall controls what enters and leaves"),
+    ],
+    [
+      "3 — animal cells have a cell wall",
+      () => anyMatches(rejects, "animal cells have a cell wall"),
+    ],
+    [
+      "4 — only plant cells have vacuoles",
+      () =>
+        // The correction is the hedge: animal cells may have temporary vacuoles, so the
+        // plant feature is specifically the *permanent* one.
+        lessonProse.includes("temporary vacuole") && lessonProse.includes("permanent"),
+    ],
+    [
+      "5 — mitochondria are the powerhouse",
+      () =>
+        anyMatches(misconceptionClaims, "powerhouse") &&
+        anyMatches(rejects, "mitochondria are the powerhouse"),
+    ],
+    [
+      "6 — chlorophyll and chloroplast are the same thing",
+      () =>
+        anyMatches(misconceptionClaims, "chlorophyll") && anyMatches(rejects, "chlorophyll"),
+    ],
+    [
+      "7 — ribosomes are too small to matter",
+      () =>
+        // Handled by teaching them at all, and by refusing the commonest wrong function.
+        lessonProse.includes("ribosome") && anyMatches(rejects, "ribosomes make energy"),
+    ],
+    [
+      "8 — air bubbles are cells",
+      () =>
+        faultIds.includes("air-bubbles") &&
+        content.questions.some((question) =>
+          question.markScheme.points.some((point) =>
+            point.text.toLowerCase().includes("bubble"),
+          ),
+        ),
+    ],
+    [
+      "9 — the drawing's magnification is the microscope's",
+      () => anyMatches(misconceptionClaims, "magnification") && anyMatches(rejects, "×400"),
+    ],
+    [
+      "10 — staining makes the cells bigger",
+      () => anyMatches(rejects, "it makes the cells bigger"),
+    ],
+    [
+      "11 — start on high power to see more detail",
+      () =>
+        faultIds.includes("lost-at-high-power") &&
+        content.questions.some((question) =>
+          question.markScheme.points.some((point) =>
+            point.text.toLowerCase().includes("lowest power"),
+          ),
+        ),
+    ],
+    [
+      "12 — focus by racking down while looking through the eyepiece",
+      () =>
+        faultIds.includes("cracked-slide") &&
+        anyMatches(rejects, "turn the coarse focus while looking down the eyepiece"),
+    ],
+  ];
+
+  it("has exactly the twelve rows the slice lists", () => {
+    expect(rows).toHaveLength(12);
+  });
+
+  for (const [name, holds] of rows) {
+    it(name, () => {
+      expect(holds()).toBe(true);
+    });
+  }
+});

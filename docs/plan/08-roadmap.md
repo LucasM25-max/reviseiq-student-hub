@@ -149,21 +149,51 @@ Scaffold, infrastructure, and the design system.
 
 ---
 
-## Phase 3 — Content spine · **L**
+## Phase 3 — Content spine · **L** — ✅ Done
 
 The pipeline from doc 04, exercised on your first real Biology source material.
 
-- Zod content schemas; `/content` structure; MDX + KaTeX rendering
-- `taxonomy.ts` for Biology `4.1.1 Cell structure` — spec points, tiers, practical links.
-  **Agreed with you first, before any prose is written** (doc 04 step 2)
-- `content:validate` (schema + coverage) wired into CI; `content:seed` (idempotent, upsert by ID)
-- First topic's lessons, notes, questions + mark schemes, blurt prompts, practical sheets
-- The diagram registry and the first 2–3 hand-built SVG components (D18)
-- **The RP1 fault table, authored as content data** (D50), and the five practical questions derived
-  from it — neither waits for the simulation engine in P4b
+- [x] Zod content schemas; `/content` structure; **Markdown** + KaTeX rendering
+- [x] `taxonomy.ts` for Biology `4.1.1 Cell structure` — spec points, tiers, practical links.
+      **Agreed with you first, before any prose is written** (doc 04 step 2)
+- [x] `content:validate` (schema + coverage) wired into CI; `content:seed` (idempotent, upsert by ID)
+- [x] First topic's lessons, notes, questions + mark schemes, blurt prompts, practical sheets
+- [x] The diagram registry and the first **three** hand-built SVG components (D18)
+- [x] **The RP1 fault table, authored as content data** (D50), and the five practical questions
+      derived from it — neither waited for the simulation engine in P4b
 
-**Exit:** `npm run content:seed` populates Postgres from files; the coverage report prints an honest
-per-sub-topic table; CI fails on a deliberately broken content file.
+**Exit — met.** `npm run content:seed` populates Postgres from files and is proven idempotent in
+CI; `npm run content:report` prints an honest per-sub-topic table that shows two sub-topics as
+`partial` rather than rounding them up to green; CI fails on deliberately broken content.
+
+**What shipped:** 3 lessons, 7 note sections, 4 blurt prompts, 17 questions (45 marks, AO split
+exactly 40/40/20, all six question types, 31.1% practical), 1 required practical with a 9-fault
+table, 5 spec points. Four routes render it: the lesson index, a lesson, the revision notes and
+the practical sheet.
+
+**Two deviations from the plan as written, both deliberate:**
+
+1. **Markdown, not MDX.** MDX allows arbitrary JSX, which zod cannot validate and Postgres cannot
+   store inert. Content is `react-markdown` + `remark-gfm` + `remark-math` + `rehype-katex`, with
+   no `rehype-raw`, so a lesson body is data rather than code. Interactivity comes from the typed
+   `widget` and `diagram` block types instead, which the validator can check.
+2. **`content:validate` runs in three ordered layers** — schema, then cross-reference, then
+   coverage gates — and stops at the first that fails. Parsing has to succeed before references
+   mean anything. The consequence for testing is that one broken file cannot exercise all three
+   layers, so `tests/fixtures/broken-content/` holds three permanently-broken fixtures, one per
+   layer, and CI asserts each is rejected.
+
+**Bugs found and fixed by exercising it,** rather than by reading it:
+
+- Seven of thirteen SVG labels overflowed their viewBox and were clipped in the browser. Both
+  cell diagrams were relaid out around a single right-hand label column, and
+  `tests/diagrams.test.ts` now renders each diagram and measures every label against the viewBox.
+- Two leader lines pointed at the wrong organelle, and the mitochondria cristae were not rotated
+  with their lozenges, so they escaped the outline.
+- Lettered structures rendered as `A — Cell wall`. Question q03 asks _"Name the structures
+  labelled A, B and C"_ over that diagram, so the figure printed its own answer. Lettering now
+  **replaces** the name rather than appending to it, which makes the giveaway unreachable rather
+  than merely fixed.
 
 ---
 

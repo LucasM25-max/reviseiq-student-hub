@@ -136,7 +136,7 @@ A lesson is an ordered array of typed **blocks** (data, not code — D6 principl
 
 | Block type      | Renders as                                                                               |
 | --------------- | ---------------------------------------------------------------------------------------- |
-| `prose`         | MDX explanation, with KaTeX for equations and chemical notation                          |
+| `prose`         | Markdown explanation, with KaTeX for equations and chemical notation (D51)               |
 | `keyIdea`       | Callout box — the one sentence that must be remembered                                   |
 | `definition`    | Term + definition, styled for glanceability                                              |
 | `example`       | Worked example, revealed step by step                                                    |
