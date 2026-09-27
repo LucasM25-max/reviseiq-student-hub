@@ -206,7 +206,7 @@ the practical sheet.
 
 ---
 
-## Phase 4 — Learn + widget engines · **XL**
+## Phase 4 — Learn + widget engines · **XL** · ✅ **Done**
 
 - Block renderers for every block type (doc 01 §3)
 - Lesson runner: progressive reveal, progress rail, resume, inline `check` blocks
@@ -218,7 +218,49 @@ the practical sheet.
 - (AI tutor deferred to P10 — the "I don't get this" button ships disabled with a "coming soon")
 
 **Exit:** a student can work through a complete Biology lesson, be stopped by checks, leave halfway
-and resume exactly where they were.
+and resume exactly where they were. ✅
+
+### How it turned out
+
+**A step is derived, not stored (D55).** A step is the run of blocks ending at and including the
+next `check`; the final step is whatever is left. What persists is `lastBlockIndex` — the last
+_block_ revealed — and the step is recomputed from it on every render. Storing a step number
+would have invalidated every saved position the first time a block was inserted mid-lesson.
+Answering a check does not advance; a separate Continue does, so the explanation can be read
+before the page moves.
+
+**Opening a page writes nothing (D56).** Progress is created by the first interaction. The
+alternative — a write on GET — would mark every lesson anyone glanced at as started, and Today
+would fill with lessons nobody opened. Step time rides in a hidden field and is clamped on
+arrival: a future or malformed timestamp scores zero, and a step is capped at 15 minutes so an
+abandoned tab cannot inflate time-on-task.
+
+**Written answers are self-marked for now (D57)**, against the real mark scheme, until the AI
+marker lands in Phase 5. The `QuestionAttempt` row is the same shape either way.
+
+**Bugs and gaps found by exercising it,** rather than by reading it:
+
+- `parseQuantity` computed standard form as `mantissa * 10 ** exponent`, and `1 * 10 ** -4` is
+  `0.00009999999999999999` in floating point, not `1e-4`. A correct answer sitting on the lower
+  bound of a tolerance window would have been marked wrong. It now builds the value as a decimal
+  string, which is exact.
+- Lesson 3, the required practical, had **no `check` block at all**, so the whole lesson was a
+  single step with nothing to gate it — the runner worked and the lesson silently opted out of it.
+  Two checks were added: the safety rule the equipment list sets up, and the
+  drawing-magnification error the practical is famous for.
+- `recordSelfMarks` took a `setId` with no `userId` and wrote marks straight through. The action
+  above it did check ownership and did clamp, but a second caller one `await` away from being
+  wrong would have been a cross-user write. Ownership and clamping now also happen in the query
+  layer, which costs one indexed read.
+- An unregistered `widgetId` rendered as "planned", which is a promise. A widget id matching no
+  engine is a content bug; it now says so, and only genuinely unbuilt engines are called planned.
+- Importing the renderer pulled the whole auth stack into the test process, where
+  `next/server` — which the `next` package exposes without an `exports` map — cannot be resolved
+  as ESM. Vitest now aliases it and inlines `next-auth`.
+
+**Proof it is tested, not just passing:** `blocksThroughStage` was temporarily sabotaged to reveal
+every block regardless of progress. The suite failed three named checks — later steps leaking into
+step 1, on both lessons, and the walk no longer terminating — and went green again on restore.
 
 ---
 

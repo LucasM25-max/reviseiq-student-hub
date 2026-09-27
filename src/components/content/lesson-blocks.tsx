@@ -10,7 +10,8 @@
  */
 import { Diagram } from "@/components/content/diagram";
 import { Markdown } from "@/components/content/markdown";
-import { getWidget } from "@/lib/content/widgets";
+import { WidgetBlock } from "@/components/content/widgets";
+import { GatedCheck, type RecordedCheck } from "@/components/learn/gated-check";
 import type { LessonBlock } from "@/lib/content/schema";
 
 import { CheckBlock } from "./check-block";
@@ -31,7 +32,34 @@ function Recap({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BlockBody({ block }: { block: LessonBlock }) {
+/**
+ * What the lesson runner needs to turn a `check` block into a persisted gate.
+ *
+ * Absent when blocks are rendered outside a lesson — a preview, a test — in which case a
+ * check falls back to the self-check version that keeps its answer in React state and
+ * gates nothing.
+ */
+export type RunnerContext = {
+  lessonId: string;
+  /** Lesson path, for the action to redirect back to. */
+  path: string;
+  /** ISO timestamp of this render, used to measure time on the step. */
+  stepStartedAt: string;
+  /** Answers already recorded, keyed by block index. */
+  checks: Record<number, RecordedCheck>;
+};
+
+function BlockBody({
+  block,
+  seed,
+  index,
+  runner,
+}: {
+  block: LessonBlock;
+  seed: string;
+  index: number;
+  runner?: RunnerContext;
+}) {
   switch (block.type) {
     case "prose":
       return <Markdown>{block.body}</Markdown>;
@@ -110,7 +138,22 @@ function BlockBody({ block }: { block: LessonBlock }) {
       );
 
     case "check":
-      return (
+      // Inside a lesson a check is a gate, so the answer has to be persisted or a reload
+      // would lock the student out of content they had already unlocked. Outside one it
+      // is a self-check and stays entirely client-side.
+      return runner ? (
+        <GatedCheck
+          lessonId={runner.lessonId}
+          path={runner.path}
+          blockIndex={index}
+          prompt={block.prompt}
+          options={block.options}
+          correctKey={block.correctKey}
+          explanation={block.explanation}
+          recorded={runner.checks[index]}
+          stepStartedAt={runner.stepStartedAt}
+        />
+      ) : (
         <CheckBlock
           prompt={block.prompt}
           options={block.options}
@@ -119,23 +162,17 @@ function BlockBody({ block }: { block: LessonBlock }) {
         />
       );
 
-    case "widget": {
-      // Widget engines arrive in Phase 4 / 4b (D40). Until then the block is rendered as
-      // an honest placeholder naming the engine and the phase, rather than silently
-      // dropped — a student should be able to see that something is meant to be here.
-      const widget = getWidget(block.widgetId);
+    case "widget":
+      // The four generic engines land in Phase 4; the microscope simulation in Phase 4b.
+      // `WidgetBlock` renders whichever exists and an honest placeholder for the one that
+      // does not, so an unbuilt engine is visible rather than a hole in the lesson.
       return (
-        <aside className="my-6 rounded-lg border border-dashed border-[var(--border)] bg-[var(--muted)]/30 px-4 py-4">
-          <p className="text-xs font-semibold tracking-wide text-[var(--muted-foreground)] uppercase">
-            Interactive · {widget?.plannedPhase ?? "planned"}
-          </p>
-          <p className="mt-1 font-medium">{widget?.title ?? block.widgetId}</p>
-          {widget ? (
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">{widget.description}</p>
-          ) : null}
-        </aside>
+        <WidgetBlock
+          widgetId={block.widgetId}
+          config={block.config}
+          seed={`${seed}:${index}`}
+        />
       );
-    }
 
     default: {
       // Exhaustiveness: adding a block type to the schema without handling it here is a
@@ -147,11 +184,29 @@ function BlockBody({ block }: { block: LessonBlock }) {
   }
 }
 
-export function LessonBlocks({ blocks }: { blocks: LessonBlock[] }) {
+export function LessonBlocks({
+  blocks,
+  seed = "lesson",
+  startIndex = 0,
+  runner,
+}: {
+  blocks: LessonBlock[];
+  /**
+   * Seeds the deterministic shuffles inside widgets. Pass the lesson id so two widgets
+   * of the same kind in different lessons do not present an identical scramble.
+   */
+  seed?: string;
+  /** Index of `blocks[0]` within the whole lesson, so widget seeds stay stable when the
+   * array is sliced for progressive reveal. */
+  startIndex?: number;
+  /** Present when these blocks are being read inside the lesson runner. */
+  runner?: RunnerContext;
+}) {
   return (
     <div>
-      {blocks.map((block, index) => {
-        const body = <BlockBody block={block} />;
+      {blocks.map((block, offset) => {
+        const index = startIndex + offset;
+        const body = <BlockBody block={block} seed={seed} index={index} runner={runner} />;
         return <div key={index}>{block.recap ? <Recap>{body}</Recap> : body}</div>;
       })}
     </div>

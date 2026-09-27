@@ -65,6 +65,8 @@ export const lesson2: LessonInput = {
       specPoints: ["bio-4112-func"],
       config: {
         instruction: "Match each structure to its function.",
+        leftHeading: "Structure",
+        rightHeading: "Function",
         pairs: [
           {
             left: "Nucleus",
@@ -115,10 +117,20 @@ export const lesson2: LessonInput = {
       specPoints: ["bio-4112-est"],
       config: {
         mode: "nested",
+        instruction:
+          "Each level sits inside the one before it. Step inwards and watch the scale drop.",
         diagramId: "bio-cell-scale-strip",
         levels: [
-          { label: "Cell", size: "10–100 µm" },
-          { label: "Nucleus", size: "5–10 µm" },
+          {
+            label: "Cell",
+            size: "10–100 µm",
+            note: "A plant cell sits at the top of this range; an animal cell nearer the bottom.",
+          },
+          {
+            label: "Nucleus",
+            size: "5–10 µm",
+            note: "Roughly a fifth to a tenth of the cell across — a useful sanity check on any estimate.",
+          },
           { label: "Chromosome", size: "about 1 µm wide" },
           { label: "Gene", size: "a short section of the DNA in a chromosome" },
         ],

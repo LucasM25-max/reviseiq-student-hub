@@ -29,6 +29,13 @@ import {
   type SubTopicDef,
   type TaxonomyDef,
 } from "./schema";
+import {
+  isBuiltWidget,
+  parseWidgetConfig,
+  type LabelTheDiagramConfig,
+  type ScaleExplorerConfig,
+} from "@/lib/widgets/schemas";
+
 import { getWidget } from "./widgets";
 
 export type ContentIssue = {
@@ -329,11 +336,53 @@ export function loadContent(raw: RawContentInput = rawContent): LoadResult {
         }
       }
 
-      if (block.type === "widget" && !getWidget(block.widgetId)) {
-        issues.push({
-          where: `${blockWhere}.widgetId`,
-          message: `no widget "${block.widgetId}" in the registry`,
-        });
+      if (block.type === "widget") {
+        const widget = getWidget(block.widgetId);
+        if (!widget) {
+          issues.push({
+            where: `${blockWhere}.widgetId`,
+            message: `no widget "${block.widgetId}" in the registry`,
+          });
+        } else if (isBuiltWidget(block.widgetId)) {
+          // An engine that exists declares the exact config it consumes, so an authored
+          // config is checked here rather than failing in the browser. An engine that
+          // has not been built yet (Phase 4b's microscope) has nothing to check against,
+          // and inventing a schema for it would only be guessing.
+          const parsed = parseWidgetConfig(block.widgetId, block.config);
+          if (!parsed.ok) {
+            for (const issue of parsed.issues) {
+              issues.push({
+                where: `${blockWhere}.config${issue.path ? `.${issue.path}` : ""}`,
+                message: issue.message,
+              });
+            }
+          } else if (parsed.widgetId === "label-the-diagram") {
+            const config = parsed.config as LabelTheDiagramConfig;
+            if (!getDiagram(config.diagramId)) {
+              issues.push({
+                where: `${blockWhere}.config.diagramId`,
+                message: `no diagram "${config.diagramId}" in the registry`,
+              });
+            } else {
+              for (const [i, key] of (config.structures ?? []).entries()) {
+                if (!getStructure(config.diagramId, key)) {
+                  issues.push({
+                    where: `${blockWhere}.config.structures.${i}`,
+                    message: `"${key}" is not a structure on diagram "${config.diagramId}"`,
+                  });
+                }
+              }
+            }
+          } else if (parsed.widgetId === "scale-explorer") {
+            const config = parsed.config as ScaleExplorerConfig;
+            if (config.diagramId && !getDiagram(config.diagramId)) {
+              issues.push({
+                where: `${blockWhere}.config.diagramId`,
+                message: `no diagram "${config.diagramId}" in the registry`,
+              });
+            }
+          }
+        }
       }
     });
   }

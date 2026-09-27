@@ -87,14 +87,18 @@ const decode = (value) =>
  * Selecting by content rather than position matters: the app shell renders a sign-out
  * form above the page's own form on most screens.
  */
-function actionFields(html, needle) {
+function actionFields(html, needle, { last = false } = {}) {
   const forms = html.split(/<form\b/).slice(1);
-  const form =
+  const matching =
     needle === null
-      ? forms[0]
-      : forms.find((candidate) =>
+      ? forms.slice(0, 1)
+      : forms.filter((candidate) =>
           candidate.slice(0, candidate.indexOf("</form>")).includes(needle),
         );
+
+  // A lesson shows every step it has revealed, so several answered checks can match the
+  // same needle. `last` picks the newest one — the gate the student is actually on.
+  const form = last ? matching[matching.length - 1] : matching[0];
 
   if (!form) throw new Error(`no form containing ${JSON.stringify(needle)}`);
 
@@ -110,9 +114,9 @@ function actionFields(html, needle) {
   return fields;
 }
 
-async function submit(path, html, values, needle = null, headers = {}) {
+async function submit(path, html, values, needle = null, headers = {}, options = {}) {
   const body = new FormData();
-  for (const [key, value] of Object.entries(actionFields(html, needle)))
+  for (const [key, value] of Object.entries(actionFields(html, needle, options)))
     body.append(key, value);
   for (const [key, value] of Object.entries(values)) {
     if (Array.isArray(value)) value.forEach((item) => body.append(key, item));
@@ -470,10 +474,7 @@ console.log("\nContent — Biology 4.1.1 (Phase 3)");
   check("lesson 1 renders", lesson.status === 200, `${lesson.status}`);
   check("markdown is rendered, not printed raw", !lesson.body.includes("**Most animal cells"));
   check("bold markdown became real markup", lesson.body.includes("<strong"));
-  check(
-    "the hand-built SVG diagram is inlined",
-    lesson.body.includes("<svg") && lesson.body.includes("Permanent vacuole"),
-  );
+  check("the hand-built SVG diagram is inlined", lesson.body.includes("<svg"));
   check("the diagram is labelled for screen readers", lesson.body.includes('role="img"'));
   check(
     "the KS3 recap is collapsible rather than hidden",
@@ -483,12 +484,13 @@ console.log("\nContent — Biology 4.1.1 (Phase 3)");
     "a check block reveals its answer without JavaScript",
     lesson.body.includes("Show the answer"),
   );
-  check("widget blocks are honest about not being built yet", lesson.body.includes("Phase 4"));
+  check(
+    "the built widgets render as real controls, not placeholders",
+    lesson.body.includes("<select") && !lesson.body.includes("Phase 4"),
+  );
 
   const maths = await get("/learn/biology/4-1-1/required-practical-microscopy");
   check("lesson 3 renders", maths.status === 200, `${maths.status}`);
-  check("KaTeX typesets the magnification formula", maths.body.includes("katex"));
-  check("the worked example reaches the right answer", maths.body.includes("120 ÷ 0.24 = 500"));
 
   const notes = await get("/revise/biology/notes/4-1-1");
   check("revision notes render", notes.status === 200, `${notes.status}`);
@@ -538,6 +540,216 @@ console.log("\nContent — Biology 4.1.1 (Phase 3)");
   ]) {
     const missing = await get(path);
     check(`404 for ${why}`, missing.status === 404, `${missing.status}`);
+  }
+}
+
+console.log("\nLearn runner and mastery check (Phase 4)");
+{
+  // A whole lesson, walked from the first gate to a marked mastery check, with
+  // JavaScript disabled throughout. This is the only place the step gating, the
+  // progress writes and the four mastery states are exercised against a real browser
+  // request rather than a unit test's idea of one.
+  const LESSON = "/learn/biology/4-1-1/inside-animal-and-plant-cells";
+
+  /** Every radio value offered by the form containing `needle`. */
+  const radioValues = (html, needle) => {
+    const forms = html
+      .split(/<form\b/)
+      .slice(1)
+      .filter((candidate) => candidate.includes(needle));
+    const form = forms[forms.length - 1];
+    if (!form) return [];
+    const body = form.slice(0, form.indexOf("</form>"));
+    return [...body.matchAll(/<input[^>]*type="radio"[^>]*>/g)]
+      .map((match) => /value="([^"]*)"/.exec(match[0])?.[1])
+      .filter(Boolean);
+  };
+
+  const step1 = await get(LESSON);
+  check("a new student starts on step 1", step1.status === 200, `${step1.status}`);
+  check("later steps are not in the markup at all", !step1.body.includes("Permanent vacuole"));
+  check("the progress rail says part 1", step1.body.includes("Part 1 of"));
+  check(
+    "the step cannot be left until its check is answered",
+    step1.body.includes("Answer the check above to carry on"),
+  );
+
+  // Answer the gate wrongly first. The explanation should appear and the step should
+  // open, but the first-attempt verdict is what gets recorded.
+  const wrong = await submit(LESSON, step1.body, { answer: "A" }, 'name="answer"');
+  check("answering the check redirects", redirected(wrong), `${wrong.status}`);
+
+  const answered = await get(LESSON);
+  check(
+    "the explanation is revealed once answered",
+    answered.body.includes("animals do not photosynthesise"),
+  );
+  check(
+    "the radios are locked so the answer cannot be changed after the reveal",
+    answered.body.includes("disabled"),
+  );
+  check("and now there is a way forward", answered.body.includes("Continue"));
+
+  const toStep2 = await submit(LESSON, answered.body, {}, 'name="toStage"');
+  check("continuing redirects", redirected(toStep2), `${toStep2.status}`);
+
+  const step2 = await get(LESSON);
+  check(
+    "step 2 reveals the next block of the lesson",
+    step2.body.includes("Permanent vacuole"),
+  );
+  check("the rail moved on", step2.body.includes("Part 2 of"));
+  check("step 1 is still on the page, not replaced", step2.body.includes("Show the answer"));
+
+  // Reloading must not lose the place — the whole point of storing progress.
+  const reloaded = await get(LESSON);
+  check("a reload keeps the student where they were", reloaded.body.includes("Part 2 of"));
+
+  /**
+   * Answers every gate and presses Continue until the lesson offers to finish.
+   *
+   * Returns the last page, or null if it got stuck — which is the failure worth
+   * catching, because a student who cannot reach the end of a lesson has no way to
+   * report anything more specific than "it stopped".
+   */
+  const walkToEnd = async (path, start) => {
+    let page = start;
+    for (let guard = 0; guard < 16; guard += 1) {
+      if (page.body.includes("Finish and check what stuck")) return page;
+
+      if (page.body.includes("Answer the check above to carry on")) {
+        const values = radioValues(page.body, 'name="answer"');
+        await submit(
+          path,
+          page.body,
+          { answer: values[values.length - 1] ?? "A" },
+          'name="answer"',
+          {},
+          { last: true },
+        );
+        page = await get(path);
+        continue;
+      }
+
+      if (!page.body.includes('name="toStage"')) return null;
+      await submit(path, page.body, {}, 'name="toStage"');
+      page = await get(path);
+    }
+    return null;
+  };
+
+  const page = await walkToEnd(LESSON, step2);
+  check("the lesson can be walked to its last step", page !== null);
+
+  const finished = await submit(LESSON, page?.body ?? step2.body, {}, 'name="finish"');
+  check(
+    "finishing redirects to the mastery check",
+    finished.location?.includes("/mastery"),
+    finished.location ?? `${finished.status}`,
+  );
+
+  const completed = await get(LESSON);
+  check("a completed lesson says so", completed.body.includes("You have finished this lesson"));
+  check(
+    "and opens the whole thing for review",
+    completed.body.includes("Permanent vacuole") && !completed.body.includes("Part 1 of"),
+  );
+
+  // ── The mastery check: intro → answer → self-mark → score ──
+  const MASTERY = `${LESSON}/mastery`;
+
+  const intro = await get(MASTERY);
+  check("the mastery intro renders", intro.status === 200, `${intro.status}`);
+  // React puts an empty comment between adjacent JSX expressions, so "{n} questions"
+  // never appears as one string. Assert on the prose either side of the count.
+  check(
+    "it says what the check is made of",
+    intro.body.includes("from the real exam bank") && intro.body.includes("in total"),
+  );
+
+  const started = await submit(MASTERY, intro.body, {}, 'name="lessonId"');
+  check("starting a run redirects to it", redirected(started), `${started.status}`);
+  check("the run id is in the URL", started.location?.includes("run="), started.location ?? "");
+
+  const runUrl = started.location.startsWith("http")
+    ? new URL(started.location).pathname + new URL(started.location).search
+    : started.location;
+
+  const questions = await get(runUrl);
+  check("the questions render", questions.status === 200, `${questions.status}`);
+  check("a multiple-choice question offers radios", questions.body.includes('type="radio"'));
+  check("a written question offers a textarea", questions.body.includes("<textarea"));
+  check(
+    "no mark scheme is visible before the answers are in",
+    !questions.body.includes("Mark scheme"),
+  );
+
+  // Submitting blank must be refused — a blank mastery check teaches nothing.
+  const blank = await submit(runUrl, questions.body, {}, 'name="setId"');
+  check(
+    "a blank submission is refused",
+    blank.body.includes("blank") || blank.body.includes("Have a go"),
+  );
+
+  // Answer everything: the right key where there is one, prose everywhere else.
+  const answers = {};
+  for (const match of questions.body.matchAll(/name="(key-[^"]+)"[^>]*value="([^"]*)"/g)) {
+    answers[match[1]] ??= match[2];
+  }
+  for (const match of questions.body.matchAll(/name="(text-[^"]+)"/g)) {
+    answers[match[1]] = "A cell wall is made of cellulose and supports the cell.";
+  }
+  check("every question got an answer", Object.keys(answers).length >= 3);
+
+  const submitted = await submit(runUrl, questions.body, answers, 'name="setId"');
+  check("answers are accepted", redirected(submitted), `${submitted.status}`);
+
+  const marking = await get(runUrl);
+  check(
+    "the mark scheme appears once the answers are in",
+    marking.body.includes("Mark scheme"),
+  );
+  check("the student's own answer is shown back to them", marking.body.includes("cellulose"));
+  check("there is a mark box per self-marked question", marking.body.includes('name="mark-'));
+
+  const marks = {};
+  for (const match of marking.body.matchAll(/name="(mark-[^"]+)"/g)) marks[match[1]] = "1";
+  const marked = await submit(runUrl, marking.body, marks, 'name="mark-');
+  check("self-marks are accepted", redirected(marked), `${marked.status}`);
+
+  const score = await get(runUrl);
+  check("a score is shown", /\d+\s*\/\s*\d+/.test(score.body) || score.body.includes("%"));
+  check("the finished run offers a retake", score.body.includes("again"));
+  check("and the answers are still there to look back at", score.body.includes("cellulose"));
+
+  // ── The same runner over a lesson with a different shape ──
+  // Lesson 3 is the required practical: no diagram, an unbuilt widget, KaTeX, and a
+  // worked example in the final step. Walking it proves the runner is driven by the
+  // lesson's structure rather than by anything special about lesson 1.
+  const PRACTICAL = "/learn/biology/4-1-1/required-practical-microscopy";
+
+  const p1 = await get(PRACTICAL);
+  check("the practical lesson is gated too", p1.body.includes("Part 1 of"));
+  check(
+    "its later steps are withheld like any other lesson",
+    !p1.body.includes("120 ÷ 0.24 = 500"),
+  );
+
+  const pEnd = await walkToEnd(PRACTICAL, p1);
+  check("the practical lesson can be walked to its end", pEnd !== null);
+
+  if (pEnd) {
+    await submit(PRACTICAL, pEnd.body, {}, 'name="finish"');
+    const done = await get(PRACTICAL);
+    check(
+      "the one genuinely unbuilt widget is honest about the phase that builds it",
+      done.body.includes("Phase 4b"),
+    );
+    check("KaTeX typesets the magnification formula", done.body.includes("katex"));
+    check(
+      "the worked example reaches the right answer",
+      done.body.includes("120 ÷ 0.24 = 500"),
+    );
   }
 }
 

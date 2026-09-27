@@ -143,10 +143,147 @@ describe("D40 — an unbuilt widget is honest, not invisible", () => {
     expect(markup).toContain("Phase 4b");
   });
 
-  it("degrades to the raw id if the widget is somehow unregistered", () => {
+  it("says plainly that an unregistered id is broken, rather than calling it planned", () => {
+    // "Planned" is a promise. An id that matches no engine is a content bug, and
+    // dressing it up as a forthcoming feature would hide it from whoever can fix it.
     const markup = render([{ type: "widget", widgetId: "not-a-widget" } as LessonBlock]);
     expect(markup).toContain("not-a-widget");
-    expect(markup).toContain("planned");
+    expect(markup).toContain("no engine of that name exists");
+    expect(markup).not.toContain("planned");
+  });
+});
+
+describe("the widget engines render without JavaScript", () => {
+  /** Every widget block in the shipped content, with the lesson it came from. */
+  const widgetBlocks = content.lessons.flatMap((lesson) =>
+    lesson.blocks.flatMap((block, index) =>
+      block.type === "widget" ? [{ lesson, block, index }] : [],
+    ),
+  );
+
+  it("finds the widgets to check", () => {
+    expect(widgetBlocks.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("renders every one of them to real markup, with no error box", () => {
+    for (const { lesson, block, index } of widgetBlocks) {
+      const markup = renderToStaticMarkup(
+        <LessonBlocks blocks={[block]} seed={`${lesson.id}:${index}`} />,
+      );
+      expect(markup.length, `${lesson.id} blocks.${index}`).toBeGreaterThan(80);
+      expect(markup, `${lesson.id} blocks.${index}`).not.toContain("could not be loaded");
+    }
+  });
+
+  it("gives a student something to do before any script runs", () => {
+    // The point of the no-JS pass: inputs exist in the server markup. A widget that
+    // only appears after hydration is a blank space on a school laptop.
+    const interactive = widgetBlocks.filter(
+      ({ block }) => block.widgetId !== "microscope-practical",
+    );
+    expect(interactive.length).toBeGreaterThanOrEqual(4);
+
+    for (const { lesson, block, index } of interactive) {
+      const markup = renderToStaticMarkup(
+        <LessonBlocks blocks={[block]} seed={`${lesson.id}:${index}`} />,
+      );
+      const hasControl = /<(input|select|button)\b/.test(markup);
+      expect(hasControl, `${block.widgetId} rendered no controls`).toBe(true);
+    }
+  });
+
+  it("ships the answers inside a closed details, not as visible text", () => {
+    // Every *graded* widget carries its own answer key, so the lesson still teaches
+    // with JavaScript off. It must start closed, or the activity is pointless. The
+    // scale explorer is deliberately not graded — there is nothing to withhold — so it
+    // is excluded rather than given a key it has no use for.
+    const graded = widgetBlocks.filter(({ block }) =>
+      ["card-sort", "comparison-table", "label-the-diagram"].includes(block.widgetId),
+    );
+    expect(graded.length).toBe(3);
+
+    for (const { lesson, block, index } of graded) {
+      const markup = renderToStaticMarkup(
+        <LessonBlocks blocks={[block]} seed={`${lesson.id}:${index}`} />,
+      );
+      expect(markup, `${block.widgetId}`).toContain("<details");
+      expect(markup, `${block.widgetId} starts open`).not.toMatch(/<details[^>]*\sopen/);
+    }
+  });
+
+  it("does not hide the scale explorer behind an answer key it has no use for", () => {
+    const explorer = widgetBlocks.find(({ block }) => block.widgetId === "scale-explorer");
+    expect(explorer).toBeDefined();
+    const markup = renderToStaticMarkup(
+      <LessonBlocks
+        blocks={[explorer!.block]}
+        seed={`${explorer!.lesson.id}:${explorer!.index}`}
+      />,
+    );
+    // It explains rather than tests, so the first level is on screen immediately.
+    expect(markup).not.toContain("<details");
+    expect(markup).toContain("Cell");
+  });
+
+  it("letters the diagram instead of naming it, so labelling is not free", () => {
+    const labelBlock = widgetBlocks.find(({ block }) => block.widgetId === "label-the-diagram");
+    expect(labelBlock).toBeDefined();
+
+    const markup = renderToStaticMarkup(
+      <LessonBlocks
+        blocks={[labelBlock!.block]}
+        seed={`${labelBlock!.lesson.id}:${labelBlock!.index}`}
+      />,
+    );
+
+    // The structure names belong in the dropdowns, not printed on the diagram (D52).
+    expect(markup).toContain("<svg");
+    expect(markup).toContain("<select");
+  });
+
+  it("is deterministic — the same seed renders byte-identical markup", () => {
+    for (const { lesson, block, index } of widgetBlocks) {
+      const seed = `${lesson.id}:${index}`;
+      const once = renderToStaticMarkup(<LessonBlocks blocks={[block]} seed={seed} />);
+      const twice = renderToStaticMarkup(<LessonBlocks blocks={[block]} seed={seed} />);
+      expect(twice, `${block.widgetId} is not stable across renders`).toBe(once);
+    }
+  });
+
+  it("varies the shuffle when the seed varies", () => {
+    const cardSort = widgetBlocks.find(({ block }) => block.widgetId === "card-sort");
+    expect(cardSort).toBeDefined();
+
+    const a = renderToStaticMarkup(<LessonBlocks blocks={[cardSort!.block]} seed="seed-a" />);
+    const b = renderToStaticMarkup(<LessonBlocks blocks={[cardSort!.block]} seed="seed-b" />);
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("a check block without a runner", () => {
+  const check: LessonBlock = {
+    type: "check",
+    prompt: "Which one?",
+    options: [
+      { key: "A", text: "First" },
+      { key: "B", text: "Second" },
+    ],
+    correctKey: "A",
+    explanation: "Because.",
+    specPoints: [],
+    recap: false,
+  };
+
+  it("still renders, so a preview or a test needs no database", () => {
+    const markup = render([check]);
+    expect(markup).toContain("Which one?");
+    expect(markup).toContain("First");
+  });
+
+  it("does not post anywhere, because there is nothing to post to", () => {
+    // The gated version is only used when the page supplies a runner. Without one the
+    // block must stay inert rather than rendering a form that 404s.
+    expect(render([check])).not.toContain("<form");
   });
 });
 

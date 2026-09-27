@@ -42,6 +42,10 @@ model User {
   availability           AvailabilitySlot[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens    PasswordResetToken[]
+  lessonProgress         LessonProgress[]
+  lessonCheckAttempts    LessonCheckAttempt[]
+  questionSets           QuestionSet[]
+  questionAttempts       QuestionAttempt[]
 
   @@index([deletedAt])
 }
@@ -442,8 +446,11 @@ model Lesson {
   blocks     Json
   version    Int    @default(1)
 
-  subTopic   SubTopic               @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
-  blockRefs  LessonBlockSpecPoint[]
+  subTopic      SubTopic               @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  blockRefs     LessonBlockSpecPoint[]
+  progress      LessonProgress[]
+  checkAttempts LessonCheckAttempt[]
+  questionSets  QuestionSet[]
 
   @@unique([subTopicId, slug])
   @@index([subTopicId, order])
@@ -546,6 +553,7 @@ model Question {
   subTopic   SubTopic            @relation(fields: [primarySubTopicId], references: [id], onDelete: Cascade)
   markScheme MarkScheme?
   specPoints QuestionSpecPoint[]
+  attempts   QuestionAttempt[]
 
   @@index([subjectId, tier, paper])
   @@index([primarySubTopicId, tier])
@@ -576,4 +584,135 @@ model MarkScheme {
   numericAnswer Json?
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Activity (Phase 4 — Learn)
+// ---------------------------------------------------------------------------
+// Everything below records what a student *did*. It is deliberately separate from the
+// content tables above, which are seeded from /content and never written by the app.
+
+/// Where a student has got to in a lesson, and how long it took them.
+///
+/// `lastBlockIndex` is the index of the last block that has been revealed, not the last
+/// step — steps are derived from the block array (src/lib/learn/stages.ts), so changing
+/// how a lesson is chunked never invalidates saved progress.
+model LessonProgress {
+  id             String        @id @default(cuid())
+  userId         String
+  lessonId       String
+  lastBlockIndex Int           @default(0)
+  state          ProgressState @default(IN_PROGRESS)
+  startedAt      DateTime      @default(now())
+  completedAt    DateTime?
+  /// Wall-clock seconds, accumulated per advance and capped per step so an abandoned
+  /// tab cannot inflate it (src/lib/learn/time.ts).
+  totalSeconds   Int           @default(0)
+  /// When the student was last seen moving through this lesson. The clock runs from here.
+  lastActivityAt DateTime      @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, state])
+}
+
+enum ProgressState {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+/// An answer to an inline `check` block.
+///
+/// Checks are not assessment — they never create a flashcard (D11) — but they are
+/// persisted, because a step gated on a check cannot be resumed unless we know the
+/// student already answered it. One row per block, updated on a retry, with the first
+/// attempt kept separately since that is the one that means anything.
+model LessonCheckAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  blockIndex  Int
+  chosenKey   String
+  correct     Boolean
+  firstCorrect Boolean
+  attempts    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId, blockIndex])
+  @@index([userId, lessonId])
+}
+
+/// A snapshotted set of questions, so a deep link stays stable and resumable.
+///
+/// Phase 4 uses it for end-of-lesson mastery checks; Phase 5 and Phase 7 reuse it for
+/// practice sets and Today deep links, which is why `lessonId` is optional.
+model QuestionSet {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String?
+  questionIds String[]
+  reason      String
+  createdAt   DateTime  @default(now())
+  /// Set when every question has been answered. Self-marking may still be outstanding.
+  answeredAt  DateTime?
+  /// Set when marking is finished and the score is final.
+  completedAt DateTime?
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson   Lesson?           @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  attempts QuestionAttempt[]
+
+  @@index([userId, createdAt])
+  @@index([userId, lessonId])
+}
+
+model QuestionAttempt {
+  id           String         @id @default(cuid())
+  userId       String
+  questionId   String
+  context      AttemptContext
+  setId        String?
+  answerText   String?
+  answerKey    String?
+  awardedMarks Int            @default(0)
+  maxMarks     Int
+  markedBy     MarkedBy
+  /// Per-mark-point detail. Phase 4 writes the deterministic checks it can make;
+  /// Phase 5 adds the AI marker's breakdown in the same shape.
+  markDetail   Json?
+  aiConfidence Float?
+  disputed     Boolean        @default(false)
+  durationSec  Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  set      QuestionSet? @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@unique([setId, questionId])
+  @@index([userId, questionId])
+  @@index([userId, createdAt])
+}
+
+enum AttemptContext {
+  LESSON_CHECK
+  PRACTICE
+  MINI_MOCK
+  FULL_MOCK
+  MASTERY_CHECK
+}
+
+enum MarkedBy {
+  AUTO
+  AI
+  AI_FALLBACK
+  SELF
 }

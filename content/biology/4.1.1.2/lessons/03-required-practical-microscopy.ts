@@ -3,7 +3,9 @@
  *
  * Block plan from docs/plan/slices/biology-4.1.1.2-animal-and-plant-cells.md §3.
  * Structurally different from lessons 1 and 2: a short framing, then the simulation,
- * then the write-up.
+ * then the write-up. Two checks gate it into three steps — one on the safety rule the
+ * equipment list sets up, one on the drawing-magnification error this practical is
+ * famous for.
  *
  * The `microscope-practical` widget is the Phase 4b engine (D50). Until it lands, the
  * renderer shows the method and fault table from the practical definition, which is the
@@ -34,6 +36,24 @@ export const lesson3: LessonInput = {
       body: "## What you need\n\nA light microscope with a ×10 eyepiece and ×4, ×10 and ×40 objective lenses. A slide and coverslip. An onion, forceps and a mounted needle. A pipette and water. Iodine solution. A paper towel. Pencil and paper for the drawing.\n\n**Eye protection goes on before the iodine comes out.** Iodine solution is an irritant, and it stains skin and clothes. Putting the goggles on after you have started is not a safety precaution, it is an apology.",
     },
     {
+      type: "check",
+      specPoints: ["bio-rp-1"],
+      prompt:
+        "Iodine solution is an irritant, and it stains skin and clothes. When should eye protection go on?",
+      options: [
+        { key: "A", text: "As soon as you start looking down the microscope." },
+        { key: "B", text: "Before the iodine solution comes out." },
+        { key: "C", text: "Only if some gets spilled." },
+        {
+          key: "D",
+          text: "Once the coverslip is on, because that is when the iodine is added.",
+        },
+      ],
+      correctKey: "B",
+      explanation:
+        "A precaution taken after the risk has started is not a precaution. D is wrong twice over: it is too late, and it puts the iodine in the wrong place in the method — the stain goes on while the specimen is still uncovered, and the coverslip is lowered afterwards.",
+    },
+    {
       type: "widget",
       widgetId: "microscope-practical",
       specPoints: ["bio-rp-1"],
@@ -55,6 +75,24 @@ export const lesson3: LessonInput = {
       claim: "The magnification you write under the drawing is the microscope's magnification.",
       correction:
         'It is not. If you viewed the cells at ×400, that is how much the **microscope** magnified them. The number under your drawing is how much larger your **drawing** is than the real cell:\n\n$$\\text{magnification} = \\frac{\\text{length of drawing}}{\\text{actual length of the cell}}$$\n\nThe two are almost never the same, because how big you chose to draw the cell has nothing to do with which lens you used. Writing "×400" under a drawing you made with a pencil is one of the most common errors on this practical.',
+    },
+    {
+      type: "check",
+      specPoints: ["bio-rp-1"],
+      prompt:
+        "A student views onion cells with a ×10 eyepiece and a ×40 objective, then draws one cell. What does the magnification written underneath the drawing tell you?",
+      options: [
+        { key: "A", text: "Which objective lens was used." },
+        { key: "B", text: "How many times larger the drawing is than the real cell." },
+        {
+          key: "C",
+          text: "How many times larger the image in the eyepiece is than the real cell.",
+        },
+        { key: "D", text: "The total magnification of the microscope, so ×400." },
+      ],
+      correctKey: "B",
+      explanation:
+        "D is the error this practical is famous for. ×400 is what the **microscope** did; the number under the drawing is what **you** did, and it depends only on how big you chose to draw the cell. C describes the microscope's magnification in different words, and A is not a magnification at all.",
     },
     {
       type: "example",
