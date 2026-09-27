@@ -136,19 +136,47 @@ export const cardSortConfigSchema = z
   });
 
 // ---------------------------------------------------------------------------
-// Registry
+// microscope-practical
 // ---------------------------------------------------------------------------
 
 /**
- * Engines that exist. `microscope-practical` is deliberately absent: it arrives in Phase
- * 4b, and until then its block renders as a placeholder, so giving it a config schema now
- * would be pretending.
+ * The Required practical 1 simulation.
+ *
+ * The config names the practical rather than restating it: the method, the fault table
+ * and the safety notes all live in the practical definition, and the engine reads them
+ * from there (D50). Duplicating them here would create a second copy to drift.
+ *
+ * `phases` exists so a lesson can run part of the practical — the drawing conventions
+ * alone, say — without the whole bench.
  */
+export const microscopePracticalConfigSchema = z.object({
+  /** The practical whose method and fault table drive the simulation. */
+  practicalId: id,
+  specimen: z.literal("onion-epidermis"),
+  phases: z
+    .array(z.enum(["prepare", "find", "draw", "measure"]))
+    .min(1)
+    .default(["prepare", "find", "draw", "measure"]),
+  /**
+   * `freehand` gives a drawing canvas; `guided-labelling` places labels on a supplied
+   * outline instead. The second is the equal-credit alternative for anyone who cannot
+   * draw with a pointer (D48), so it is a config option and not a hidden fallback.
+   */
+  drawing: z.enum(["freehand", "guided-labelling"]).default("freehand"),
+  instruction: text.optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Registry
+// ---------------------------------------------------------------------------
+
+/** Engines that exist. */
 export const WIDGET_CONFIG_SCHEMAS = {
   "label-the-diagram": labelTheDiagramConfigSchema,
   "comparison-table": comparisonTableConfigSchema,
   "scale-explorer": scaleExplorerConfigSchema,
   "card-sort": cardSortConfigSchema,
+  "microscope-practical": microscopePracticalConfigSchema,
 } as const;
 
 export type BuiltWidgetId = keyof typeof WIDGET_CONFIG_SCHEMAS;
@@ -157,6 +185,7 @@ export type LabelTheDiagramConfig = z.output<typeof labelTheDiagramConfigSchema>
 export type ComparisonTableConfig = z.output<typeof comparisonTableConfigSchema>;
 export type ScaleExplorerConfig = z.output<typeof scaleExplorerConfigSchema>;
 export type CardSortConfig = z.output<typeof cardSortConfigSchema>;
+export type MicroscopePracticalConfig = z.output<typeof microscopePracticalConfigSchema>;
 
 export type WidgetConfigFor<Id extends BuiltWidgetId> = z.output<
   (typeof WIDGET_CONFIG_SCHEMAS)[Id]

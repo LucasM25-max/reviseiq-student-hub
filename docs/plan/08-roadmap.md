@@ -264,7 +264,7 @@ step 1, on both lessons, and the walk no longer terminating — and went green a
 
 ---
 
-## Phase 4b — Practical engine · **XL**
+## Phase 4b — Practical engine · **XL** · ✅ **Done**
 
 New workstream, added 27 Sep 2026 (D45). Sits after Learn because the practical renders as a
 lesson block and is that system's most demanding consumer — a good architectural stress test early
@@ -294,7 +294,60 @@ rather than polishing open-endedly.
 
 **Exit:** a student completes all 20 steps of AQA's student sheet, makes a technique mistake, sees
 the consequence in the field of view, and answers an exam question about why that step matters —
-with the whole simulation's logic covered by `vitest` and no browser required.
+with the whole simulation's logic covered by `vitest` and no browser required. **Met**, with one
+exception recorded below.
+
+**What shipped.** `src/lib/practicals/microscope/` is eight pure modules — `state`, `actions`,
+`reduce`, `faults`, `optics`, `graticule`, `drawing`, `rubric`, `trace`, `method` — with no React
+and no DOM, and `src/components/content/widgets/microscope-practical/` is a thin renderer over
+them. 224 tests, none needing a browser.
+
+Two rules carried the design. **Mistakes are allowed to happen:** the reducer refuses only the
+physically impossible — blotting a slide with no coverslip — and never declines bad technique,
+because a reducer that quietly declined the wrong action would be a warning wearing a disguise.
+**No fault is ever stored:** all nine are derived from state on every read, so the moment a student
+blots the slide or adds the stain they forgot, the field of view stops lying about what is on it.
+History that genuinely matters — the blind descent, iodine before goggles, the first objective
+viewed — is recorded as a fact, and the fault is still derived from it.
+
+**Bugs found by exercising it,** rather than by reading it:
+
+- `peelEpidermis` put the specimen straight onto the slide and `placeSpecimen` did nothing — the
+  opposite of what its own comment claimed. `dry-mount` therefore fired the instant the onion was
+  touched, before a slide was involved, and "water before specimen" was unmarkable because the two
+  could not be ordered. The peel now travels onion → forceps → slide, which is the gap the water
+  goes in.
+- Over-staining rendered **pale**. `contrast` was modelling two opposite failures with one number:
+  too little iodine leaves the field faint, too much leaves it _dark_, and the picture flatly
+  contradicted the description sitting beside it. Split into `contrast` and `wash`.
+- A dry mount was drawn as a marginally duller fill, when the content promises the cells "shrivel,
+  the edges darken, and the specimen curls away". The contents now visibly pull back from the wall.
+- The field of view emitted **one SVG node per cell**: 1,334 nodes and 240 KB of markup for a single
+  widget at ×40, re-rendered on every turn of the focus knob. It is now one repeating `<pattern>` —
+  8 nodes and 1.9 KB, and identical to look at.
+- Filter and clip ids were global constants, so two simulations on one page would have shared a
+  blur filter and each rendered with the other's focus. Scoped with `useId`.
+- A step's done state was announced only when it was **done**, leaving a screen-reader user unable
+  to tell an outstanding step from one with no marker at all. Both states are now in text.
+- Four Phase 4 engines still carried `plannedPhase: "Phase 4"` after being built, so the registry
+  claimed four working widgets were unbuilt. All five are now `null`, and a test asserts the widget
+  registry and the config-schema registry agree exactly.
+
+**Verified by looking, not only by asserting.** The field of view was rasterised with `sharp` at
+every magnification and every fault state and inspected as contact sheets. Three of the bugs above
+— the pale over-stain, the invisible dry mount, and `too-thick` being too subtle to notice — were
+found that way and would not have been caught by any assertion I had thought to write.
+
+**The one thing outstanding:** the **axe check**. It needs a real browser, which this environment
+cannot provide. A static audit of the server markup stands in — labels, accessible names, duplicate
+ids, nothing focusable behind `aria-hidden`, state in text rather than colour alone — and the axe
+run should happen the first time this is opened in a real browser.
+
+**Deferred to Phase 5, deliberately:** the two drawing-rubric rows that need judgement — "the cells
+look like onion epidermal cells" and "each label points at the structure it names". They report as
+_pending_ rather than guessing, because a confident wrong tick on a student's drawing costs more
+trust than an honest gap. The other five rows are decided from the stroke vectors exactly and for
+free, which is the whole reason D47 captures strokes as points and never as a bitmap.
 
 ---
 

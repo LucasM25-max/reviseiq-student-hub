@@ -742,8 +742,17 @@ console.log("\nLearn runner and mastery check (Phase 4)");
     await submit(PRACTICAL, pEnd.body, {}, 'name="finish"');
     const done = await get(PRACTICAL);
     check(
-      "the one genuinely unbuilt widget is honest about the phase that builds it",
-      done.body.includes("Phase 4b"),
+      "the microscope simulation renders, with no placeholder left anywhere",
+      done.body.includes("Required practical: looking at onion cells") &&
+        !done.body.includes("Phase 4b"),
+    );
+    check(
+      "the simulation describes the field of view in words, not only in pixels",
+      done.body.includes("Down the eyepiece:"),
+    );
+    check(
+      "the bench offers the wrong technique as well as the right one",
+      done.body.includes("Drop it flat") && done.body.includes("Lower it slowly with a needle"),
     );
     check("KaTeX typesets the magnification formula", done.body.includes("katex"));
     check(

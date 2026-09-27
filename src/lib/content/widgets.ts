@@ -2,10 +2,14 @@
  * Widget registry (D40 — widgets are generic, data-driven engines, never per-topic
  * components).
  *
- * Phase 3 registers the ids and records which phase builds each engine. That is enough
- * for `npm run content:validate` to reject a typo'd `widgetId` today, and for the lesson
- * renderer to show an honest placeholder for an engine that has not been built yet
- * rather than crashing or silently dropping the block.
+ * The registry names every engine and records which roadmap phase builds it, so
+ * `npm run content:validate` can reject a typo'd `widgetId` and the lesson renderer can
+ * show an honest placeholder for an engine that does not exist yet rather than crashing
+ * or silently dropping the block.
+ *
+ * Every engine is now built, so every `plannedPhase` is `null`. The field stays because
+ * the next new widget will need it, and because a placeholder is a much better failure
+ * than a blank space in a lesson.
  */
 
 export type WidgetMeta = {
@@ -23,33 +27,33 @@ export const WIDGETS: WidgetMeta[] = [
     title: "Label the diagram",
     description:
       "Drag or type labels onto a registered SVG diagram, optionally from memory before the content is revealed.",
-    plannedPhase: "Phase 4",
+    plannedPhase: null,
   },
   {
     id: "comparison-table",
     title: "Comparison table",
     description: "Fill in a tick-or-cross grid comparing two or more things across named rows.",
-    plannedPhase: "Phase 4",
+    plannedPhase: null,
   },
   {
     id: "scale-explorer",
     title: "Scale explorer",
     description:
       "Zoom through nested levels of scale, or place objects on a logarithmic size axis.",
-    plannedPhase: "Phase 4",
+    plannedPhase: null,
   },
   {
     id: "card-sort",
     title: "Card sort",
     description: "Match cards from one column to cards in another, with immediate feedback.",
-    plannedPhase: "Phase 4",
+    plannedPhase: null,
   },
   {
     id: "microscope-practical",
     title: "Microscope practical",
     description:
       "The Required practical 1 simulation: prepare a slide, drive the microscope, draw and measure. Consumes the fault table from the practical definition (D50).",
-    plannedPhase: "Phase 4b",
+    plannedPhase: null,
   },
 ];
 

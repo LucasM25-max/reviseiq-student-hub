@@ -301,19 +301,55 @@ describe("widget config schemas", () => {
 
   it("knows which engines exist", () => {
     expect(isBuiltWidget("card-sort")).toBe(true);
-    expect(isBuiltWidget("microscope-practical")).toBe(false);
+    expect(isBuiltWidget("microscope-practical")).toBe(true);
     expect(Object.keys(WIDGET_CONFIG_SCHEMAS).sort()).toEqual([
       "card-sort",
       "comparison-table",
       "label-the-diagram",
+      "microscope-practical",
       "scale-explorer",
     ]);
   });
 
-  it("reports an unbuilt engine distinctly, so the renderer can show a placeholder", () => {
-    const parsed = parseWidgetConfig("microscope-practical", { practicalId: "bio-rp-1" });
+  it("reports an engine that does not exist distinctly, so the renderer can say so", () => {
+    const parsed = parseWidgetConfig("not-an-engine", { practicalId: "bio-rp-1" });
     expect(parsed.ok).toBe(false);
     expect(parsed.ok === false && parsed.issues[0].message).toContain("no engine for widget");
+  });
+
+  it("accepts the authored microscope config and fills in the defaults", () => {
+    const parsed = parseWidgetConfig("microscope-practical", {
+      practicalId: "bio-rp-1",
+      specimen: "onion-epidermis",
+    });
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok && parsed.config).toMatchObject({
+      practicalId: "bio-rp-1",
+      drawing: "freehand",
+      phases: ["prepare", "find", "draw", "measure"],
+    });
+  });
+
+  it("rejects a specimen the simulation cannot show", () => {
+    // Onion only, settled. A config asking for anything else should fail loudly at
+    // validation rather than render an onion and call it a cheek cell.
+    expect(
+      parseWidgetConfig("microscope-practical", {
+        practicalId: "bio-rp-1",
+        specimen: "cheek-cells",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("offers guided labelling as a first-class config option, not a hidden fallback", () => {
+    const parsed = parseWidgetConfig("microscope-practical", {
+      practicalId: "bio-rp-1",
+      specimen: "onion-epidermis",
+      drawing: "guided-labelling",
+    });
+    expect(parsed.ok && (parsed.config as { drawing: string }).drawing).toBe(
+      "guided-labelling",
+    );
   });
 
   it("returns paths on config issues so the validator can point at the field", () => {

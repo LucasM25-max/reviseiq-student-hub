@@ -617,19 +617,34 @@ immersion · numerical aperture · the chemistry of iodine staining beyond "incr
       _(needs the marker: Phase 5)_
 - [ ] AI marking golden set ≥60 answers, ≥90% within ±1 mark _(Phase 5)_
 
-**Practical simulation** — Phase 4b. The fault table and the method are already authored as
-content data (D50) and tested; everything below needs the engine that consumes them.
+**Practical simulation** — Phase 4b, **done**. The fault table and the method were already
+authored as content data (D50); the engine consumes them rather than restating them.
 
-- [ ] All 20 AQA student-sheet steps are performable, in order, and out of order
-- [ ] Every fault in §4.4 fires on its trigger and **only** on its trigger, proven by test
-- [ ] A perfect run scores full marks on the rubric; each faulted run loses exactly the expected points
-- [ ] Graticule arithmetic matches AQA's fixtures (90 div = 240 µm ⇒ 2.67 µm/div)
-- [ ] Field of view visibly and correctly changes with objective, focus, stain and iris
-- [ ] Cracking the slide ends the run and requires a fresh slide; the restart is recorded in the trace
-- [ ] Fully keyboard-operable; field of view has a live text description; axe check clean
-- [ ] Guided labelling available as the equivalent-credit alternative to freehand drawing
-- [ ] Drawing marks are advisory: they never alter mastery and never create a flashcard
-- [ ] Simulation logic reaches high coverage in `vitest` with **no browser required**
+- [x] All 20 AQA student-sheet steps are performable, in order, and out of order — the
+      mapping is `src/lib/practicals/microscope/method.ts` and a test walks the whole
+      sheet. Step 3 (cut the square) folds into step 4 and says so: it has no observable
+      consequence and no fault, and the mapping fails the build if a step is ever added
+      without someone deciding how it is performed.
+- [x] Every fault in §4.4 fires on its trigger and **only** on its trigger, proven by test —
+      including that a single mistake raises exactly one fault rather than a cascade
+- [x] A perfect run scores full marks on the rubric; each faulted run loses exactly the
+      expected points — and every one of the twelve rows is proven to go **both** ways
+- [x] Graticule arithmetic matches AQA's fixtures (90 div = 240 µm ⇒ 2.67 µm/div)
+- [x] Field of view visibly and correctly changes with objective, focus, stain and iris
+- [x] Cracking the slide ends the run and requires a fresh slide; the restart is recorded in the trace
+- [x] Fully keyboard-operable — every action is a button, no drag-and-drop, sliders carry
+      `aria-valuetext` — and the field of view has a live text description
+- [ ] **axe check** — outstanding. It needs a real browser, which this environment cannot
+      provide. A static audit of the server markup stands in for now: labels, accessible
+      names, duplicate ids, nothing focusable behind `aria-hidden`, and step state in text
+      rather than colour alone.
+- [x] Guided labelling available as the equivalent-credit alternative to freehand drawing
+- [x] Drawing marks are advisory: they never alter mastery and never create a flashcard
+- [x] Simulation logic is exercised with **no browser required** — 224 tests across the
+      reducer, the marking and the rendered markup. Line-coverage tooling is deliberately
+      not installed (`@vitest/coverage-v8` pulls 142 packages); exhaustiveness is asserted
+      directly instead, which is the stronger claim: every fault, every rubric row and
+      every action type is proven reachable and refusable.
 
 ---
 

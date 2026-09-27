@@ -15,12 +15,14 @@ import type {
   CardSortConfig,
   ComparisonTableConfig,
   LabelTheDiagramConfig,
+  MicroscopePracticalConfig,
   ScaleExplorerConfig,
 } from "@/lib/widgets/schemas";
 
 import { CardSortWidget } from "./card-sort";
 import { ComparisonTableWidget } from "./comparison-table";
 import { LabelTheDiagramWidget, type LabelSlot } from "./label-the-diagram";
+import { MicroscopePracticalWidget } from "./microscope-practical";
 import { ScaleExplorerWidget } from "./scale-explorer";
 
 /**
@@ -73,8 +75,8 @@ export function WidgetBlock({
   const parsed = parseWidgetConfig(widgetId, config);
 
   if (!parsed.ok) {
-    // An unbuilt engine (Phase 4b's microscope) fails `parseWidgetConfig` because it has
-    // no schema. That is the placeholder case, not an error.
+    // An engine with no schema yet fails `parseWidgetConfig`. That is the placeholder
+    // case, not an error.
     if (parsed.issues.some((issue) => issue.message.startsWith("no engine for widget"))) {
       return <WidgetPlaceholder widgetId={widgetId} />;
     }
@@ -122,6 +124,9 @@ export function WidgetBlock({
 
     case "card-sort":
       return <CardSortWidget config={parsed.config as CardSortConfig} seed={seed} />;
+
+    case "microscope-practical":
+      return <MicroscopePracticalWidget config={parsed.config as MicroscopePracticalConfig} />;
 
     case "scale-explorer": {
       const scaleConfig = parsed.config as ScaleExplorerConfig;

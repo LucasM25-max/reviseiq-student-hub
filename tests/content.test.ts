@@ -5,6 +5,7 @@ import { DIAGRAMS, getDiagram } from "@/lib/content/diagrams";
 import { loadContent } from "@/lib/content/registry";
 import { lessonBlockSchema, noteSectionSchema } from "@/lib/content/schema";
 import { WIDGETS, widgetIds } from "@/lib/content/widgets";
+import { WIDGET_CONFIG_SCHEMAS } from "@/lib/widgets/schemas";
 
 /**
  * The real content, held to the standard it will be marked against.
@@ -177,18 +178,25 @@ describe("registries", () => {
     ]);
 
     for (const widget of WIDGETS) {
-      // Nothing is built yet, so every widget must still name the phase that builds it.
-      expect(widget.plannedPhase, `${widget.id} has no planned phase`).toMatch(/^Phase /);
       expect(
         widget.description.length,
         `${widget.id} needs a real description`,
       ).toBeGreaterThan(30);
+
+      // `plannedPhase` means "not built yet". A built engine that still names a phase
+      // would make the renderer offer a placeholder for something that works.
+      if (widget.plannedPhase !== null) {
+        expect(widget.plannedPhase, `${widget.id} has a malformed phase`).toMatch(/^Phase /);
+      }
     }
 
-    // The practical simulation is the one widget that belongs to Phase 4b (D45).
-    expect(WIDGETS.find((widget) => widget.id === "microscope-practical")?.plannedPhase).toBe(
-      "Phase 4b",
-    );
+    // Every engine is built as of Phase 4b, so the registry and the schema registry
+    // must now agree exactly. This is the check that catches a widget registered but
+    // never given an engine.
+    expect(widgetIds().sort()).toEqual(Object.keys(WIDGET_CONFIG_SCHEMAS).sort());
+    for (const widget of WIDGETS) {
+      expect(widget.plannedPhase, `${widget.id} is built but still claims a phase`).toBeNull();
+    }
   });
 
   it("resolves every diagram referenced by a question", () => {

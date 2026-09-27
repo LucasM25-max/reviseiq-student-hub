@@ -135,12 +135,16 @@ describe("D39 — prior-stage material is collapsible, never hidden", () => {
 });
 
 describe("D40 — an unbuilt widget is honest, not invisible", () => {
-  it("names the engine and the phase that builds it", () => {
-    const markup = render([
-      { type: "widget", widgetId: "microscope-practical" } as LessonBlock,
-    ]);
-    expect(markup).toContain("Microscope practical");
-    expect(markup).toContain("Phase 4b");
+  it("renders the microscope simulation now that its engine exists", () => {
+    // It used to render a "Phase 4b" placeholder. Phase 4b happened.
+    const block = content.lessons
+      .flatMap((lesson) => lesson.blocks)
+      .find((entry) => entry.type === "widget" && entry.widgetId === "microscope-practical");
+    expect(block).toBeDefined();
+
+    const markup = render([block as LessonBlock]);
+    expect(markup).not.toContain("Phase 4b");
+    expect(markup).toContain("Required practical");
   });
 
   it("says plainly that an unregistered id is broken, rather than calling it planned", () => {
@@ -178,10 +182,8 @@ describe("the widget engines render without JavaScript", () => {
   it("gives a student something to do before any script runs", () => {
     // The point of the no-JS pass: inputs exist in the server markup. A widget that
     // only appears after hydration is a blank space on a school laptop.
-    const interactive = widgetBlocks.filter(
-      ({ block }) => block.widgetId !== "microscope-practical",
-    );
-    expect(interactive.length).toBeGreaterThanOrEqual(4);
+    const interactive = widgetBlocks;
+    expect(interactive.length).toBeGreaterThanOrEqual(5);
 
     for (const { lesson, block, index } of interactive) {
       const markup = renderToStaticMarkup(
