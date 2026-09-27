@@ -149,7 +149,7 @@ Scaffold, infrastructure, and the design system.
 
 ---
 
-## Phase 3 — Content spine · **L** — ✅ Done
+## Phase 3 — Content spine · **L** · ✅ **Done**
 
 The pipeline from doc 04, exercised on your first real Biology source material.
 

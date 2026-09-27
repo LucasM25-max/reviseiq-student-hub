@@ -8,7 +8,6 @@
  * Rendered with `renderToStaticMarkup`, which is what the server does, so what is
  * asserted here is what is sent to the browser.
  */
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -22,7 +21,7 @@ if (!result.ok) throw new Error("content failed to load — see tests/content.te
 const content = result.content;
 
 const render = (blocks: LessonBlock[]) =>
-  renderToStaticMarkup(createElement(LessonBlocks, { blocks }));
+  renderToStaticMarkup(<LessonBlocks blocks={blocks} />);
 
 /** Heading levels in document order. */
 const headingLevels = (markup: string) =>
@@ -177,7 +176,7 @@ describe("check blocks", () => {
 describe("Markdown headingOffset", () => {
   const body = "## A section\n\nProse.\n\n### A sub-section\n\nMore prose.";
   const render = (offset: number) =>
-    renderToStaticMarkup(createElement(Markdown, { headingOffset: offset, children: body }));
+    renderToStaticMarkup(<Markdown headingOffset={offset}>{body}</Markdown>);
 
   it("renders ## as h2 in a lesson block, which sits directly under the page h1", () => {
     expect(headingLevels(render(0))).toEqual([2, 3]);
@@ -197,15 +196,13 @@ describe("Markdown headingOffset", () => {
 
   it("never emits an h1, even from a stray '#'", () => {
     // The schema rejects "#", but the renderer is defensive too: a page has one h1.
-    const markup = renderToStaticMarkup(
-      createElement(Markdown, { children: "# Stray\n\nProse." }),
-    );
+    const markup = renderToStaticMarkup(<Markdown>{"# Stray\n\nProse."}</Markdown>);
     expect(headingLevels(markup)).toEqual([2]);
   });
 
   it("clamps rather than emitting an h7", () => {
     const markup = renderToStaticMarkup(
-      createElement(Markdown, { headingOffset: 2, children: "###### Deepest" }),
+      <Markdown headingOffset={2}>{"###### Deepest"}</Markdown>,
     );
     expect(headingLevels(markup)).toEqual([6]);
   });
@@ -214,9 +211,7 @@ describe("Markdown headingOffset", () => {
     for (const page of content.notes) {
       for (const section of page.sections) {
         const levels = headingLevels(
-          renderToStaticMarkup(
-            createElement(Markdown, { headingOffset: 1, children: section.body }),
-          ),
+          renderToStaticMarkup(<Markdown headingOffset={1}>{section.body}</Markdown>),
         );
         for (const level of levels) {
           expect(level, `${section.slug} rendered an h${level}`).toBeGreaterThanOrEqual(3);

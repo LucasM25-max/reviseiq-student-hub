@@ -17,7 +17,7 @@ export default defineConfig({
     environment: "node",
     globals: false,
     setupFiles: ["./tests/setup.ts"],
-    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     // The database round-trip suite opens real connections; give it room.
     testTimeout: 30_000,
     hookTimeout: 30_000,

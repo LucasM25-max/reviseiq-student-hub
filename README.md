@@ -17,20 +17,28 @@ Foundation and Higher tier. Four surfaces:
 
 ## Status
 
-**Phases 0–2 are built.** You can create an account, complete onboarding and reach a working
-app shell. There is no curriculum content, no scheduling engine and no AI marking yet — those
-are Phases 3–7.
+**Phases 0–3 are built.** You can create an account, complete onboarding, and read the first
+real topic — three lessons, revision notes and a required-practical sheet for AQA Biology
+`4.1.1.2 Animal and plant cells`, rendered from authored content files. There is no lesson
+runner, no interactive widgets, no scheduling engine and no AI marking yet — those are
+Phases 4–7.
 
 | Phase                    |     | What it gave us                                                                         |
 | ------------------------ | --- | --------------------------------------------------------------------------------------- |
 | **0** Foundations        | ✅  | Next.js 16, TypeScript, Tailwind v4, Prisma + Postgres, design system, CI               |
 | **1** Accounts           | ✅  | Email/password + Google, email verification, password reset, age gate, sessions         |
 | **2** Onboarding & shell | ✅  | Subjects → tier & exam dates → RAG ratings → availability, plus Learn/Revise/Test/Today |
-| **3** Content pipeline   | ⬜  | Authoring format, validation, review workflow, first Biology slice                      |
+| **3** Content spine      | ✅  | Authoring format, validation, seeding, diagrams, and the first Biology topic            |
 | **4–13**                 | ⬜  | See the [roadmap](./docs/plan/08-roadmap.md)                                            |
 
 Today currently renders a **preview plan** built from your real ratings and availability. It is
 clearly labelled as such in the UI; the real engine lands in Phase 7.
+
+The first topic is one sub-topic of one subject — 3 lessons, 7 note sections, 17 exam questions
+(45 marks) and Required practical 1. `npm run content:report` prints what is covered and, more
+usefully, what is not: two spec points are reported as **partial** rather than rounded up to
+green, because plasmids cannot be taught before bacterial cells exist and the practical is
+onion-only for now.
 
 ---
 
