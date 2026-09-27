@@ -1,0 +1,369 @@
+// ReviseIQ — database schema
+// Phases 0–2: identity, student profile, curriculum taxonomy, enrolment, RAG, availability.
+// Later phases (content, attempts, flashcards, plans) are specified in docs/plan/03-data-model.md.
+//
+// Prisma 7: the connection URL lives in prisma.config.ts, not here, and the client is
+// Rust-free — it connects through the @prisma/adapter-pg driver adapter (see src/lib/db/prisma.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity — Auth.js v5 core models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  /// argon2id. Null for accounts created via Google only.
+  passwordHash  String?
+  /// Collected solely for the age gate (under-13s are blocked) and age-appropriate defaults.
+  dateOfBirth   DateTime? @db.Date
+  role          Role      @default(STUDENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  accounts               Account[]
+  sessions               Session[]
+  authenticators         Authenticator[]
+  profile                StudentProfile?
+  enrolments             SubjectEnrolment[]
+  ragRatings             RagRating[]
+  availability           AvailabilitySlot[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens    PasswordResetToken[]
+
+  @@index([deletedAt])
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+/// Unused at runtime — the Credentials provider forces JWT sessions — but the
+/// Prisma adapter requires the model to exist.
+model Session {
+  sessionToken String   @id
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+/// WebAuthn. Not used in v1; present because the adapter's types expect it.
+model Authenticator {
+  credentialID         String  @id
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Identity — our own tokens (hashed at rest, never stored in plaintext)
+// ---------------------------------------------------------------------------
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  /// sha256 of the token that was emailed. The raw token exists only in the email.
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Postgres-backed token bucket. Avoids adding Redis as a dependency in v1
+/// (docs/plan/02-architecture.md).
+model RateBucket {
+  key       String   @id
+  count     Int      @default(0)
+  windowEnd DateTime
+
+  @@index([windowEnd])
+}
+
+// ---------------------------------------------------------------------------
+// Student profile
+// ---------------------------------------------------------------------------
+
+model StudentProfile {
+  userId String @id
+
+  displayName String?
+  timezone    String    @default("Europe/London")
+  /// D26 — Year 10 and Year 11 get materially different scheduling behaviour.
+  yearGroup   YearGroup @default(YEAR_11)
+
+  dailyGoalMinutes   Int @default(30)
+  /// D24 — holidays are a different regime from term time.
+  holidayGoalMinutes Int @default(60)
+
+  onboardingStep        OnboardingStep @default(SUBJECTS)
+  onboardingCompletedAt DateTime?
+
+  // Habit layer (D35): streaks only. No XP, no levels, no achievements.
+  streakCurrent     Int       @default(0)
+  streakLongest     Int       @default(0)
+  streakFreezesLeft Int       @default(2)
+  lastActiveDate    DateTime? @db.Date
+
+  // End of the exam season (D27)
+  examsCompletedAt      DateTime?
+  congratulationsSeenAt DateTime?
+  schedulingEnabled     Boolean   @default(true)
+
+  // Preferences
+  reminderChannel ReminderChannel @default(NONE)
+  /// e.g. ["18:30"] — local times in the profile timezone.
+  reminderTimes   String[]        @default([])
+  reduceMotion    Boolean         @default(false)
+  dyslexiaFont    Boolean         @default(false)
+  theme           String          @default("system")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum YearGroup {
+  YEAR_10
+  YEAR_11
+  OTHER
+}
+
+enum ReminderChannel {
+  NONE
+  EMAIL
+  PUSH
+  BOTH
+}
+
+/// Tracks progress through onboarding so it is resumable.
+enum OnboardingStep {
+  SUBJECTS
+  SETUP
+  RAG
+  AVAILABILITY
+  DONE
+}
+
+// ---------------------------------------------------------------------------
+// Curriculum taxonomy (seeded; read-mostly)
+// ---------------------------------------------------------------------------
+
+model Subject {
+  id          String      @id
+  code        SubjectCode @unique
+  examBoard   String      @default("AQA")
+  qualCode    String
+  name        String
+  /// Tailwind token suffix used for the subject accent colour.
+  accent      String
+  order       Int
+  topics      Topic[]
+  enrolments  SubjectEnrolment[]
+}
+
+enum SubjectCode {
+  BIOLOGY
+  CHEMISTRY
+  PHYSICS
+}
+
+model Topic {
+  id        String @id
+  subjectId String
+  /// AQA specification code, e.g. "4.1".
+  code      String
+  number    Int
+  title     String
+  /// Which exam paper this topic is assessed on.
+  paper     Int
+  order     Int
+
+  subject    Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subTopics  SubTopic[]
+  ragRatings RagRating[]
+
+  @@unique([subjectId, code])
+  @@index([subjectId, order])
+}
+
+/// Populated with content in Phase 3. Progressive sub-topic RAG (D19) depends on it.
+model SubTopic {
+  id      String @id
+  topicId String
+  /// AQA specification code, e.g. "4.1.1".
+  code    String
+  title   String
+  order   Int
+
+  topic      Topic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  ragRatings RagRating[]
+
+  @@unique([topicId, code])
+  @@index([topicId, order])
+}
+
+// ---------------------------------------------------------------------------
+// Student state
+// ---------------------------------------------------------------------------
+
+model SubjectEnrolment {
+  id        String     @id @default(cuid())
+  userId    String
+  subjectId String
+  tier      TierChoice @default(UNSURE)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  examDates ExamDate[]
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+}
+
+enum TierChoice {
+  FOUNDATION
+  HIGHER
+  UNSURE
+}
+
+model ExamDate {
+  id          String   @id @default(cuid())
+  enrolmentId String
+  paper       Int
+  date        DateTime @db.Date
+  /// false when the date is an estimate ("summer of 2027") rather than a real timetable entry.
+  confirmed   Boolean  @default(false)
+
+  enrolment SubjectEnrolment @relation(fields: [enrolmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrolmentId, paper])
+}
+
+/// D19 — topic-level at onboarding, sub-topic added progressively later.
+/// effectiveRag(subTopic) = subTopicRating ?? parentTopicRating
+model RagRating {
+  id         String    @id @default(cuid())
+  userId     String
+  scope      RagScope
+  topicId    String?
+  subTopicId String?
+  value      RagValue
+  source     RagSource @default(USER)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic    Topic?    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  subTopic SubTopic? @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@unique([userId, subTopicId])
+  @@index([userId, value])
+}
+
+enum RagScope {
+  TOPIC
+  SUBTOPIC
+}
+
+enum RagValue {
+  NOT_LEARNT
+  RED
+  AMBER
+  GREEN
+}
+
+enum RagSource {
+  USER
+  SUGGESTED_ACCEPTED
+  IMPORTED
+}
+
+model AvailabilitySlot {
+  id      String  @id @default(cuid())
+  userId  String
+  /// 0 = Sunday … 6 = Saturday (matches JavaScript's Date#getDay).
+  weekday Int
+  minutes Int
+  /// Optional preferred start time, "HH:mm" in the profile timezone.
+  preferredStart String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekday])
+  @@index([userId])
+}

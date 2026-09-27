@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+/* next-themes toggles the `dark` class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ReviseIQ design tokens (D23 — a serious revision tool).
+ *
+ * Calm, high-contrast and typography-led. One restrained primary, three subject accents
+ * used only for wayfinding, and a RAG palette that never carries meaning through colour
+ * alone (every RAG control also has a label and an icon).
+ *
+ * System font stack by choice: no third-party font request from a student's browser,
+ * no layout shift, nothing to consent to.
+ */
+
+:root {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius: 0.625rem;
+
+  /* Surfaces */
+  --background: oklch(0.994 0.001 260);
+  --foreground: oklch(0.216 0.012 260);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.968 0.004 260);
+  --muted-foreground: oklch(0.505 0.014 260);
+  --border: oklch(0.912 0.006 260);
+  --input: oklch(0.912 0.006 260);
+  --ring: oklch(0.52 0.13 262);
+
+  /* Primary — a restrained indigo. */
+  --primary: oklch(0.46 0.14 262);
+  --primary-hover: oklch(0.41 0.14 262);
+  --primary-foreground: oklch(0.99 0.002 260);
+
+  --secondary: oklch(0.968 0.004 260);
+  --secondary-foreground: oklch(0.28 0.012 260);
+
+  --destructive: oklch(0.52 0.19 27);
+  --destructive-foreground: oklch(0.99 0.002 260);
+  --destructive-surface: oklch(0.966 0.018 20);
+  --destructive-border: oklch(0.88 0.06 22);
+
+  --success: oklch(0.51 0.12 158);
+  --success-surface: oklch(0.965 0.025 158);
+  --success-border: oklch(0.87 0.06 158);
+
+  --warning: oklch(0.56 0.12 75);
+  --warning-surface: oklch(0.97 0.035 85);
+  --warning-border: oklch(0.88 0.07 80);
+
+  /* Subject accents (doc 01 §9.3) */
+  --biology: oklch(0.52 0.11 156);
+  --biology-surface: oklch(0.962 0.025 156);
+  --chemistry: oklch(0.52 0.12 240);
+  --chemistry-surface: oklch(0.962 0.028 240);
+  --physics: oklch(0.51 0.14 300);
+  --physics-surface: oklch(0.963 0.028 300);
+
+  /* RAG palette (D19) */
+  --rag-not-learnt: oklch(0.52 0.012 260);
+  --rag-not-learnt-surface: oklch(0.958 0.004 260);
+  --rag-red: oklch(0.52 0.19 27);
+  --rag-red-surface: oklch(0.962 0.03 22);
+  --rag-amber: oklch(0.57 0.13 72);
+  --rag-amber-surface: oklch(0.965 0.05 85);
+  --rag-green: oklch(0.5 0.13 156);
+  --rag-green-surface: oklch(0.96 0.035 156);
+}
+
+.dark {
+  --background: oklch(0.176 0.011 262);
+  --foreground: oklch(0.945 0.004 260);
+  --card: oklch(0.216 0.013 262);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.256 0.013 262);
+  --muted-foreground: oklch(0.72 0.011 260);
+  --border: oklch(0.312 0.014 262);
+  --input: oklch(0.336 0.015 262);
+  --ring: oklch(0.68 0.12 262);
+
+  --primary: oklch(0.7 0.13 265);
+  --primary-hover: oklch(0.76 0.13 265);
+  --primary-foreground: oklch(0.18 0.02 265);
+
+  --secondary: oklch(0.262 0.013 262);
+  --secondary-foreground: oklch(0.93 0.005 260);
+
+  --destructive: oklch(0.63 0.17 25);
+  --destructive-foreground: oklch(0.15 0.02 25);
+  --destructive-surface: oklch(0.28 0.06 22);
+  --destructive-border: oklch(0.42 0.1 24);
+
+  --success: oklch(0.7 0.13 158);
+  --success-surface: oklch(0.27 0.05 158);
+  --success-border: oklch(0.4 0.08 158);
+
+  --warning: oklch(0.76 0.13 80);
+  --warning-surface: oklch(0.29 0.05 80);
+  --warning-border: oklch(0.44 0.09 80);
+
+  --biology: oklch(0.72 0.13 156);
+  --biology-surface: oklch(0.27 0.045 156);
+  --chemistry: oklch(0.71 0.12 240);
+  --chemistry-surface: oklch(0.27 0.05 240);
+  --physics: oklch(0.72 0.13 300);
+  --physics-surface: oklch(0.28 0.05 300);
+
+  --rag-not-learnt: oklch(0.72 0.012 260);
+  --rag-not-learnt-surface: oklch(0.26 0.008 260);
+  --rag-red: oklch(0.68 0.16 25);
+  --rag-red-surface: oklch(0.29 0.06 22);
+  --rag-amber: oklch(0.78 0.13 78);
+  --rag-amber-surface: oklch(0.3 0.055 78);
+  --rag-green: oklch(0.72 0.14 156);
+  --rag-green-surface: oklch(0.28 0.05 156);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-destructive-border: var(--destructive-border);
+
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-success-border: var(--success-border);
+
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+
+  --color-biology: var(--biology);
+  --color-biology-surface: var(--biology-surface);
+  --color-chemistry: var(--chemistry);
+  --color-chemistry-surface: var(--chemistry-surface);
+  --color-physics: var(--physics);
+  --color-physics-surface: var(--physics-surface);
+
+  --color-rag-not-learnt: var(--rag-not-learnt);
+  --color-rag-not-learnt-surface: var(--rag-not-learnt-surface);
+  --color-rag-red: var(--rag-red);
+  --color-rag-red-surface: var(--rag-red-surface);
+  --color-rag-amber: var(--rag-amber);
+  --color-rag-amber-surface: var(--rag-amber-surface);
+  --color-rag-green: var(--rag-green);
+  --color-rag-green-surface: var(--rag-green-surface);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A single, consistent, always-visible focus treatment. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Native controls inherit the theme rather than the OS. */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Visible only to screen readers, but focusable (used by the skip link). */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}

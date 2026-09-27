@@ -1,0 +1,8 @@
+# Generated or vendored — never reformat
+src/generated/
+.next/
+node_modules/
+package-lock.json
+.mail/
+prisma/migrations/
+public/
