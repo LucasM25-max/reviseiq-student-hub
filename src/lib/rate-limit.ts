@@ -26,6 +26,12 @@ export const RATE_LIMITS = {
   emailVerification: { limit: 3, windowSeconds: 60 * 60 },
   /** Password-reset requests, per email. */
   passwordReset: { limit: 3, windowSeconds: 60 * 60 },
+  /**
+   * AI marking, per user. Sits in front of the daily quota rather than instead of it:
+   * the quota controls spend across a day, this stops a loop burning it in seconds.
+   * Generous enough that working through a practice set never trips it.
+   */
+  aiMark: { limit: 20, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

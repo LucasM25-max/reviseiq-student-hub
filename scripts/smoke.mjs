@@ -422,7 +422,7 @@ console.log("\nThe app shell");
   for (const [path, needle] of [
     ["/learn", "Your syllabus"],
     ["/revise", "Revision aids come after"],
-    ["/test", "Questions and marking"],
+    ["/test", "Practise a topic"],
     ["/settings", "Topic ratings"],
     ["/settings/subjects", "Add a science"],
     ["/settings/exams", "Tier and exam dates"],
@@ -912,6 +912,101 @@ console.log("\nSecurity headers");
     !(headers.get("content-security-policy") ?? "").includes("frame-ancestors"),
     headers.get("content-security-policy") ?? "none",
   );
+}
+
+console.log("\nTest — practice and AI marking (Phase 5)");
+{
+  // The signed-in student from the walk-through above has finished onboarding.
+  const test = await get("/test");
+  check(
+    "GET /test",
+    test.status === 200 && test.body.includes("Practise a topic"),
+    `${test.status}`,
+  );
+
+  const started = await submit("/test", test.body, {}, 'name="subTopicId"');
+  check("starting a practice run", redirected(started), `${started.status}`);
+
+  const runPath = started.location ?? "";
+  check("  — lands on the run", runPath.startsWith("/test/practice/"), runPath);
+
+  const run = await get(runPath);
+  check(
+    "the run shows a question and an answer box",
+    run.status === 200 && /name="answer(Text|Key)"/.test(run.body),
+    `${run.status}`,
+  );
+
+  // The mark scheme must not be on the page while the question is still open.
+  check(
+    "the mark scheme is not visible before answering",
+    !run.body.includes("The full mark scheme"),
+  );
+
+  const isObjective = run.body.includes('name="answerKey"');
+  const answered = await submit(
+    runPath,
+    run.body,
+    isObjective
+      ? { answerKey: "B" }
+      : {
+          answerText:
+            "Plant cells have a cellulose cell wall, chloroplasts and a permanent vacuole.",
+        },
+    isObjective ? 'name="answerKey"' : 'name="answerText"',
+  );
+  check("submitting an answer for marking", answered.status === 200, `${answered.status}`);
+
+  const marked = await get(runPath);
+  check(
+    "the mark and its breakdown are shown",
+    marked.status === 200 &&
+      /Marked by AI|Checked by word matching|Marked automatically/.test(marked.body),
+    `${marked.status}`,
+  );
+  check("  — with the mark scheme now revealed", marked.body.includes("The full mark scheme"));
+  check(
+    "  — and a way to say the mark is wrong",
+    marked.body.includes("I think this mark is wrong"),
+  );
+  check(
+    "  — and the standing disclaimer that it is not an examiner",
+    marked.body.includes("not an examiner"),
+  );
+
+  // The API route, which the marking UI and any future client share.
+  const api = await request("/api/ai/mark", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      questionId: "bio-4112-q06",
+      answerText:
+        "Chloroplasts are the site of photosynthesis. Palisade cells get light; roots do not.",
+      context: "PRACTICE",
+    }),
+  });
+  const marking = await api.json().catch(() => ({}));
+  check("POST /api/ai/mark", api.status === 200, `${api.status}`);
+  check(
+    "  — never awards more than the question is worth",
+    typeof marking?.result?.awardedMarks === "number" &&
+      marking.result.awardedMarks <= marking.result.maxMarks,
+    `${marking?.result?.awardedMarks}/${marking?.result?.maxMarks}`,
+  );
+  check(
+    "  — degrades to the deterministic marker with no API key",
+    process.env.GEMINI_API_KEY
+      ? marking?.result?.source === "AI"
+      : marking?.result?.source === "AI_FALLBACK" && marking?.result?.provisional === true,
+    `${marking?.result?.source}`,
+  );
+
+  const rejected = await request("/api/ai/mark", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ answerText: "no question id" }),
+  });
+  check("  — rejects a malformed request", rejected.status === 400, `${rejected.status}`);
 }
 
 console.log("\nBehind a reverse proxy");

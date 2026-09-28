@@ -44,6 +44,8 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   lessonProgress         LessonProgress[]
   lessonCheckAttempts    LessonCheckAttempt[]
+  aiUsage                AiUsage[]
+  specPointMastery       SpecPointMastery[]
   questionSets           QuestionSet[]
   questionAttempts       QuestionAttempt[]
 
@@ -429,6 +431,7 @@ model SpecPoint {
   subTopic        SubTopic               @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
   questionLinks   QuestionSpecPoint[]
   lessonBlockRefs LessonBlockSpecPoint[]
+  mastery         SpecPointMastery[]
 
   @@index([subTopicId, order])
 }
@@ -688,7 +691,11 @@ model QuestionAttempt {
   /// Phase 5 adds the AI marker's breakdown in the same shape.
   markDetail   Json?
   aiConfidence Float?
+  /// Which prompt produced an AI mark, so a prompt change can be evaluated later.
+  promptVersion String?
   disputed     Boolean        @default(false)
+  disputeReason String?
+  disputedAt   DateTime?
   durationSec  Int            @default(0)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -715,4 +722,95 @@ enum MarkedBy {
   AI
   AI_FALLBACK
   SELF
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — AI marking
+// ---------------------------------------------------------------------------
+
+/// Exact-answer cache for AI marks (doc 06 §6).
+///
+/// GCSE short answers repeat heavily across students, so the same (question, answer)
+/// pair is marked once and replayed. Keyed on the model and prompt version as well as
+/// the answer, because a mark produced by a different prompt is a different mark.
+model MarkCache {
+  /// sha256(questionId + model + promptVersion + normalisedAnswer).
+  key           String   @id
+  questionId    String
+  model         String
+  promptVersion String
+  /// The post-processed MarkResult, exactly as it was served.
+  result        Json
+  hits          Int      @default(0)
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime @default(now())
+
+  @@index([questionId])
+  @@index([lastUsedAt])
+}
+
+/// Cost and reliability ledger. One row per call, including cache hits and fallbacks,
+/// so per-student cost and the global ceiling are both answerable from one table.
+model AiUsage {
+  id            String     @id @default(cuid())
+  userId        String?
+  feature       AiFeature
+  model         String
+  promptVersion String
+  inputTokens   Int        @default(0)
+  outputTokens  Int        @default(0)
+  /// Micro-dollars (1e-6 USD) — integers, because floating point money is a bug.
+  costMicroUsd  Int        @default(0)
+  latencyMs     Int        @default(0)
+  outcome       AiOutcome
+  createdAt     DateTime   @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([feature, createdAt])
+}
+
+enum AiFeature {
+  MARK
+  MARK_BATCH
+  BLURT
+  TUTOR
+  CARD_TEXT
+}
+
+enum AiOutcome {
+  OK
+  CACHED
+  FALLBACK_NO_KEY
+  FALLBACK_QUOTA
+  FALLBACK_CEILING
+  FALLBACK_ERROR
+  FALLBACK_SCHEMA
+  ERROR
+}
+
+/// Rolling per-spec-point mastery, updated from every marked attempt.
+///
+/// Held as an exponential moving average of proportion-of-marks rather than a raw
+/// total, so recent work counts for more and a bad week early on does not haunt a
+/// student forever. Today reads this to decide what to schedule.
+model SpecPointMastery {
+  id          String   @id @default(cuid())
+  userId      String
+  specPointId String
+  /// 0–1 exponential moving average of marks earned / marks available.
+  mastery     Float    @default(0)
+  attempts    Int      @default(0)
+  marksEarned Int      @default(0)
+  marksTotal  Int      @default(0)
+  lastSeenAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specPoint SpecPoint @relation(fields: [specPointId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, specPointId])
+  @@index([userId, mastery])
 }
