@@ -89,6 +89,24 @@ export default async function LoginPage({
             Create an account
           </Link>
         </p>
+
+        {/*
+          A way out of an embedded view. When ReviseIQ is shown inside another site the
+          browser may refuse to keep the session cookie, and signing in then fails in
+          the most confusing way possible — the form simply reappears. Opening the app
+          at the top level makes the cookie first-party, which always works.
+        */}
+        <p className="text-center text-xs text-muted-foreground">
+          Signing in does nothing?{" "}
+          <a
+            href="/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded font-medium underline hover:text-foreground"
+          >
+            Open ReviseIQ in its own tab
+          </a>
+        </p>
       </CardContent>
     </Card>
   );

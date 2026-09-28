@@ -1,6 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { cookies } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 
@@ -117,6 +118,30 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
 // Sign in / out
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether the browser is keeping the cookies we set.
+ *
+ * Rendering the login page always sets a CSRF cookie, so any submission of that form
+ * should carry at least one cookie back. None at all means the browser is discarding
+ * everything we send — which is what a cross-site iframe looks like when third-party
+ * cookies are blocked.
+ *
+ * Worth detecting explicitly because the failure is otherwise completely silent and
+ * looks like a broken button: signing in genuinely succeeds, the session cookie is
+ * genuinely set, the browser throws it away, and the redirect lands back on the login
+ * page with nothing to show for it. The student sees the form reappear and has no way
+ * of knowing why.
+ */
+async function browserKeepsCookies(): Promise<boolean> {
+  const jar = await cookies();
+  return jar.getAll().length > 0;
+}
+
+const COOKIES_BLOCKED_ERROR =
+  "Your browser is blocking cookies for this page, so we can't keep you signed in. " +
+  "This usually happens when the app is shown inside another site — open it in its own " +
+  "browser tab and sign in there.";
+
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const rawEmail = text(formData, "email");
   const password = formData.get("password");
@@ -127,6 +152,10 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   if (!email.success || typeof password !== "string" || password.length === 0) {
     return formError(GENERIC_SIGN_IN_ERROR);
   }
+
+  // Checked before the attempt, so a student is never told their details are wrong
+  // when the real problem is that the session could never have been kept.
+  if (!(await browserKeepsCookies())) return formError(COOKIES_BLOCKED_ERROR);
 
   const signedIn = await attemptCredentialsSignIn(email.data, password);
   if (!signedIn) return formError(GENERIC_SIGN_IN_ERROR);
