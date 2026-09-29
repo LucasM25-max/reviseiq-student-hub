@@ -46,6 +46,8 @@ model User {
   lessonCheckAttempts    LessonCheckAttempt[]
   aiUsage                AiUsage[]
   specPointMastery       SpecPointMastery[]
+  flashcards             Flashcard[]
+  blurtAttempts          BlurtAttempt[]
   questionSets           QuestionSet[]
   questionAttempts       QuestionAttempt[]
 
@@ -432,6 +434,8 @@ model SpecPoint {
   questionLinks   QuestionSpecPoint[]
   lessonBlockRefs LessonBlockSpecPoint[]
   mastery         SpecPointMastery[]
+  cardTemplates   CardTemplate[]
+  flashcards      Flashcard[]
 
   @@index([subTopicId, order])
 }
@@ -526,6 +530,7 @@ model BlurtPrompt {
   order          Int
 
   subTopic SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  attempts BlurtAttempt[]
 
   @@index([subTopicId, order])
 }
@@ -557,6 +562,7 @@ model Question {
   markScheme MarkScheme?
   specPoints QuestionSpecPoint[]
   attempts   QuestionAttempt[]
+  cardTemplates CardTemplate[]
 
   @@index([subjectId, tier, paper])
   @@index([primarySubTopicId, tier])
@@ -813,4 +819,145 @@ model SpecPointMastery {
 
   @@unique([userId, specPointId])
   @@index([userId, mastery])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Flashcards (FSRS-6) and semi-blurting
+// ---------------------------------------------------------------------------
+
+/// Card text, generated once and shared by every student (doc 07 §2).
+///
+/// The front and back depend only on (question, mark point, spec point) — never on
+/// who missed it — so at steady state creating a card is a free database lookup and
+/// only a genuinely novel pair costs an API call.
+model CardTemplate {
+  /// "<questionId>:<markPointId>".
+  id          String   @id
+  questionId  String
+  markPointId String
+  specPointId String
+  cardType    CardType @default(QA)
+  front       String
+  back        String
+  hint        String?
+  /// Model plus prompt version, so a bad generation can be found and reissued.
+  generatedBy String
+  /// Human spot-check flag.
+  reviewed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  question  Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  specPoint SpecPoint   @relation(fields: [specPointId], references: [id], onDelete: Cascade)
+  cards     Flashcard[]
+
+  @@index([questionId])
+  @@index([specPointId])
+}
+
+enum CardType {
+  QA
+  DEFINITION
+  CLOZE
+}
+
+/// One student's card, carrying its FSRS state (D12).
+model Flashcard {
+  id          String @id @default(cuid())
+  userId      String
+  templateId  String
+  specPointId String
+
+  /// FSRS-6 state. Names mirror ts-fsrs so the mapping stays obvious.
+  due            DateTime
+  stability      Float     @default(0)
+  difficulty     Float     @default(0)
+  elapsedDays    Int       @default(0)
+  scheduledDays  Int       @default(0)
+  reps           Int       @default(0)
+  lapses         Int       @default(0)
+  learningSteps  Int       @default(0)
+  state          CardState @default(NEW)
+  lastReview     DateTime?
+
+  /// Eight lapses means the idea was never understood; more repetitions won't fix it.
+  leech       Boolean   @default(false)
+  suspendedAt DateTime?
+  /// Set when exam performance proves the point is known. Cards do not grow forever.
+  retiredAt   DateTime?
+  /// "From a question you got wrong on 14 Oct" — and a way to challenge it.
+  sourceAttemptId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template  CardTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  specPoint SpecPoint    @relation(fields: [specPointId], references: [id], onDelete: Cascade)
+  reviews   CardReview[]
+
+  @@unique([userId, templateId])
+  @@index([userId, due])
+  @@index([userId, specPointId])
+}
+
+enum CardState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+}
+
+/// One review, storing the **prior** state in full so undo is exact (doc 07 §3).
+model CardReview {
+  id         String     @id @default(cuid())
+  cardId     String
+  userId     String
+  rating     CardRating
+  reviewedAt DateTime   @default(now())
+  durationMs Int        @default(0)
+
+  /// The card exactly as it was before this review. Undo restores these verbatim
+  /// rather than re-deriving them, which floating-point FSRS state cannot guarantee.
+  priorDue           DateTime
+  priorStability     Float
+  priorDifficulty    Float
+  priorElapsedDays   Int
+  priorScheduledDays Int
+  priorReps          Int
+  priorLapses        Int
+  priorLearningSteps Int
+  priorState         CardState
+  priorLastReview    DateTime?
+
+  card Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, reviewedAt])
+  @@index([userId, reviewedAt])
+}
+
+enum CardRating {
+  AGAIN
+  HARD
+  GOOD
+  EASY
+}
+
+/// A semi-blurt: everything a student could remember, scored for idea coverage (D15).
+model BlurtAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  promptId    String
+  text        String
+  coveragePct Int      @default(0)
+  /// { coverage:[{pointId,present,evidence}], extrasCorrect[], extrasWrong[], encouragement }
+  detail      Json?
+  markedBy    MarkedBy @default(AI_FALLBACK)
+  durationSec Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt BlurtPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([promptId])
 }

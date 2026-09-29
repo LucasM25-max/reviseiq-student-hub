@@ -421,7 +421,7 @@ console.log("\nThe app shell");
 
   for (const [path, needle] of [
     ["/learn", "Your syllabus"],
-    ["/revise", "Revision aids come after"],
+    ["/revise", "Your revision tools"],
     ["/test", "Practise a topic"],
     ["/settings", "Topic ratings"],
     ["/settings/subjects", "Add a science"],
@@ -1007,6 +1007,80 @@ console.log("\nTest — practice and AI marking (Phase 5)");
     body: JSON.stringify({ answerText: "no question id" }),
   });
   check("  — rejects a malformed request", rejected.status === 400, `${rejected.status}`);
+}
+
+console.log("\nRevise — flashcards and blurting (Phase 6)");
+{
+  // The walk-through student has just had answers marked, so the deck has cards.
+  const hub = await get("/revise");
+  check("GET /revise", hub.status === 200 && hub.body.includes("Flashcards"), `${hub.status}`);
+
+  const deck = await get("/revise/flashcards");
+  check("GET /revise/flashcards", deck.status === 200, `${deck.status}`);
+
+  const hasCards = deck.body.includes('name="rating"');
+  check(
+    "a wrong answer produced a card to review",
+    hasCards,
+    hasCards ? "deck has due cards" : "no due cards — did marking create any?",
+  );
+
+  if (hasCards) {
+    // The no-JS grading form: one card per page load.
+    const graded = await submit("/revise/flashcards", deck.body, {}, 'name="rating"');
+    check("grading a card", graded.status === 200, `${graded.status}`);
+
+    const after = await get("/revise/flashcards");
+    check(
+      "  — and the card leaves the due queue",
+      after.status === 200 && after.body !== deck.body,
+      `${after.status}`,
+    );
+  }
+
+  // Blurting (D15).
+  const prompts = /href="\/revise\/blurt\/([^"]+)"/.exec(hub.body);
+  check("the Revise hub offers a blurt prompt", prompts !== null, prompts?.[1] ?? "none found");
+
+  if (prompts) {
+    const blurt = await get(`/revise/blurt/${prompts[1]}`);
+    check(
+      "GET a blurt prompt",
+      blurt.status === 200 && /name="text"/.test(blurt.body),
+      `${blurt.status}`,
+    );
+
+    const tooShort = await submit(
+      "/revise/blurt/" + prompts[1],
+      blurt.body,
+      { text: "no" },
+      'name="text"',
+    );
+    check(
+      "  — an empty blurt is refused rather than scored",
+      tooShort.status === 200 && tooShort.body.includes("Write what you can remember"),
+      `${tooShort.status}`,
+    );
+
+    const written = await submit(
+      "/revise/blurt/" + prompts[1],
+      blurt.body,
+      {
+        text: "Plant cells have a cellulose cell wall, chloroplasts for photosynthesis and a permanent vacuole holding cell sap. Animal cells have a nucleus, cytoplasm, a cell membrane, mitochondria for aerobic respiration and ribosomes for protein synthesis.",
+      },
+      'name="text"',
+    );
+    check("submitting a blurt", written.status === 200, `${written.status}`);
+
+    const scored = await get(`/revise/blurt/${prompts[1]}`);
+    check(
+      "  — coverage is shown idea by idea",
+      scored.status === 200 &&
+        scored.body.includes("of the ideas") &&
+        scored.body.includes("Idea by idea"),
+      `${scored.status}`,
+    );
+  }
 }
 
 console.log("\nBehind a reverse proxy");

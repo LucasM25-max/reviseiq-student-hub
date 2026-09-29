@@ -13,6 +13,7 @@ import "server-only";
 
 import { markOpenResponse } from "@/lib/ai/mark";
 import { markedByFor, type MarkInput, type MarkResult } from "@/lib/ai/types";
+import { createCardsForAttempt, retireProvenCards } from "@/lib/flashcards/create";
 import { autoMark, isObjective } from "@/lib/marking/auto";
 import { nextMastery, weightFor } from "@/lib/marking/mastery";
 import { prisma } from "@/lib/db/prisma";
@@ -189,6 +190,30 @@ export async function markAnswer(request: MarkRequest): Promise<MarkSuccess | Ma
     markedBy: markedByFor(result.source),
     provisional: result.provisional,
   });
+
+  /*
+   * The deck builds itself from mistakes (D11). Both calls are best-effort and
+   * swallow their own failures: a student's mark must never be lost because a card
+   * could not be written.
+   */
+  const specPointIds = await prisma.questionSpecPoint
+    .findMany({ where: { questionId: question.id }, select: { specPointId: true } })
+    .then((links) => links.map((link) => link.specPointId))
+    .catch(() => [] as string[]);
+
+  if (result.awardedMarks >= result.maxMarks && result.maxMarks > 0) {
+    // Exam performance is the evidence that matters, so proving it retires the cards.
+    await retireProvenCards(request.userId, specPointIds);
+  } else {
+    await createCardsForAttempt({
+      userId: request.userId,
+      questionId: question.id,
+      attemptId: attempt.id,
+      setId: request.setId ?? null,
+      context: request.context,
+      result,
+    });
+  }
 
   return { ok: true, result, attemptId: attempt.id };
 }

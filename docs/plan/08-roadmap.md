@@ -411,7 +411,7 @@ which is the right direction for a matcher that cannot read.
 
 ---
 
-## Phase 6 — Revise + FSRS · **L**
+## Phase 6 — Revise + FSRS · **L** · ✅ **Done**
 
 - Notes pages with sticky contents, tier toggle, stable section anchors, inline practicals
 - Formula sheet with the `givenInExam` split and self-test mode
@@ -422,7 +422,40 @@ which is the right direction for a matcher that cannot read.
   coverage UI linking back into notes
 
 **Exit:** get a question wrong → a card appears → review it with FSRS → the interval behaves
-correctly. Complete a blurt and get honest idea-coverage feedback.
+correctly. Complete a blurt and get honest idea-coverage feedback. **Met**, with two items
+carried forward below.
+
+**What shipped.** `src/lib/fsrs/` is the only place `ts-fsrs` (v5.4.2, FSRS-6) is imported, and it
+is pure — state in, state out, clock passed in — which is what makes a 180-day simulation a unit
+test rather than a hope. `src/lib/flashcards/` splits into pure parts (the anti-flood caps, the
+session ordering) and database parts (creation from a marked attempt, grade, undo, suspend, leech,
+retirement). Marking now creates cards on a wrong answer and retires them on sustained right ones,
+both best-effort so a student's mark can never be lost to a card write. Blurting scores idea
+coverage through the same two-path shape as marking: a model when a key is configured, a
+deterministic scorer that always works.
+
+**Bugs found by exercising it,** rather than by reading it:
+
+- The queue appended every leftover new card at the end of a session, so the one-in-four rule held
+  in the middle and then broke completely — a wall of unseen cards exactly where a student is most
+  likely to stop. Leftovers now wait for tomorrow.
+- `maximum_interval` is applied by `ts-fsrs` _before_ fuzz, so intervals came back at **367 days**.
+  Clamped, because the ceiling is a product decision about a fixed exam date, not a tuning knob.
+- Cards were filed under `specPoints[0]` — whichever the database listed first. Retirement looks
+  for full marks on _that_ spec point, so retirement was a coin flip. Each card is now filed under
+  the spec point its mark point is actually about.
+- Blurt scoring credited "cell wall" for the text _"cells are small"_: on a two-word alias, half
+  the tokens is one word. Short phrases must now be named outright — the failure mode here is
+  telling a student they remembered something they plainly did not.
+
+**Proof it is tested, not just passing:** removing the relearning priority from the queue failed
+the named ordering test and passed again on restore, with no residue.
+
+**Carried forward, deliberately:** the **formula sheet** with its `givenInExam` split, and
+**AI-written card text**. Card text today is generated from the mark scheme's own words — accurate
+by construction, because every word came from content a human wrote, and a little stiff to read.
+The `CardTemplate` row records `generatedBy`, so the templates written by the weaker path can be
+found and reissued once a key is configured rather than silently persisting.
 
 ---
 
