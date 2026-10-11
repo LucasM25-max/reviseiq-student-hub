@@ -6,6 +6,7 @@ import { Markdown } from "@/components/content/markdown";
 import { MarkBreakdown } from "@/components/test/mark-breakdown";
 import { AnswerForm } from "@/components/test/practice-forms";
 import { requireOnboardedUser } from "@/lib/auth/session";
+import { markTaskDoneById, markTaskStarted } from "@/lib/today/actions";
 import { practiceRunFor, reviewMaterialFor } from "@/lib/test/queries";
 
 export const metadata: Metadata = {
@@ -22,12 +23,30 @@ type Option = { key: string; text: string };
  * mark scheme, the first unanswered one shows its input. That keeps the whole run
  * reviewable in one place and means a page reload never loses a student's position.
  */
-export default async function PracticePage({ params }: { params: Promise<{ setId: string }> }) {
+export default async function PracticePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ setId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireOnboardedUser();
   const { setId } = await params;
+  const query = await searchParams;
 
   const run = await practiceRunFor(user.id, setId);
   if (!run) notFound();
+
+  /*
+   * The `?task=` round trip (doc 05 §10). Arriving from Today records that the task
+   * was started; finishing the set ticks it off, so the student lands back on a plan
+   * with the item already done rather than having to tell us twice.
+   */
+  const taskId = typeof query.task === "string" ? query.task : null;
+  if (taskId) {
+    await markTaskStarted(user.id, taskId);
+    if (run.completedAt) await markTaskDoneById(user.id, taskId);
+  }
 
   // Only ever loaded for questions that already have an attempt.
   const review = await Promise.all(
@@ -49,8 +68,11 @@ export default async function PracticePage({ params }: { params: Promise<{ setId
             marks
           </p>
         </div>
-        <Link href="/test" className="rounded text-sm underline hover:no-underline">
-          Back to Test
+        <Link
+          href={taskId ? "/today" : "/test"}
+          className="rounded text-sm underline hover:no-underline"
+        >
+          {taskId ? "Back to Today" : "Back to Test"}
         </Link>
       </header>
 
@@ -151,8 +173,8 @@ export default async function PracticePage({ params }: { params: Promise<{ setId
       {run.completedAt ? (
         <p className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4 text-sm">
           You finished this set — {run.awarded} out of {run.available} marks.{" "}
-          <Link href="/test" className="underline hover:no-underline">
-            Practise another topic
+          <Link href={taskId ? "/today" : "/test"} className="underline hover:no-underline">
+            {taskId ? "Back to Today — it's ticked off" : "Practise another topic"}
           </Link>
           .
         </p>

@@ -459,7 +459,7 @@ found and reissued once a key is configured rather than silently persisting.
 
 ---
 
-## Phase 7 — The Today engine · **XL**
+## Phase 7 — The Today engine · **XL** · ✅ **Core done**
 
 The payoff phase. Everything before it exists so this can work.
 
@@ -482,7 +482,43 @@ The payoff phase. Everything before it exists so this can work.
 **Exit — this is the vertical slice done.** A student completes onboarding, opens Today, is told to
 review 12 cards and do 5 questions on a named sub-topic, clicks straight into exactly that, gets
 AI-marked, generates cards from mistakes, returns to a ticked-off plan, and gets a different,
-sensible plan tomorrow.
+sensible plan tomorrow. **Met.** Verified end to end: Today generates on
+first visit, deep-links into a frozen `QuestionSet`, marks the task started, ticks it off on
+completion, and re-packs to 22 minutes when asked for 20.
+
+**What shipped.** `src/lib/today/` is nine pure modules — types, weights, mode, gate, scoring,
+candidates, packing, rationale, plan — with no I/O at all. Data is fetched once in `snapshot.ts`,
+passed in, and a plan comes out. That is what makes 186 engine tests possible, including sixteen
+archetypal students each checked against every plan invariant.
+
+Materialisation freezes payloads at generation time, which is the part that makes a deep link
+honest: the five questions the rationale promised are the five the student gets, because the
+`QuestionSet` snapshot exists before the href does. Plans are superseded rather than edited, so
+"what was I asked to do on Tuesday" stays answerable after a quick-session re-plan.
+
+**Bugs and design faults found by exercising it:**
+
+- The rationale could never say _"this is on your Biology test on Thursday"_ for a Red topic,
+  because `W.rag` (28) outranks anything `schoolTestUrgency` can produce for a class test. The
+  score is left alone — it is tuned — but the rationale now leads with an imminent test, since
+  that is why the task is there today, and D25 exists precisely because near deadlines are what
+  get acted on.
+- Changing the daily goal left today's plan sized for a day the student is not living. Saving
+  availability now supersedes the live plan.
+- Two high-severity advisories appeared in `audit:prod` (Next SSRF and cache poisoning; KaTeX
+  prototype pollution). Next pinned to 16.3.8, KaTeX taken to 0.19 with an `overrides` entry for
+  the copies nested under `rehype-katex`. Back to **0 vulnerabilities**.
+
+**Proof it is tested, not just passing:** packing was sabotaged to ignore the time budget. Four
+named invariants failed — including the fifteen-minute archetype and the slow-reader case — and
+all passed again on restore, with no residue.
+
+**Carried forward, and genuinely not built:** the school-calendar and school-test **management
+UIs** (D24/D25 — the engine consumes both, and `SchoolTest`/`LearningNowFlag` rows exist, but
+nothing yet lets a student add one); the **nightly Vercel cron** (generation is on-demand only);
+`RagSuggestion` prompts and the post-test _"how did it go?"_ flow; the **end-of-season
+congratulations screen** (D27 — the planner stops correctly, the screen is not built); and
+adaptive re-ranking on surprising performance. Mini and full mocks belong to Phase 8.
 
 ---
 

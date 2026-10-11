@@ -339,6 +339,17 @@ export async function saveAvailabilityAction(
     }),
   ]);
 
+  /*
+   * The student has just told us how much time they actually have, so today's plan
+   * is now sized for a day they are not living. Superseding it means the next visit
+   * to Today re-plans against the new figure rather than showing yesterday's
+   * assumptions until midnight.
+   */
+  await prisma.dayPlan.updateMany({
+    where: { userId: user.id, supersededAt: null },
+    data: { supersededAt: new Date() },
+  });
+
   redirect(safeRedirectPath(text(formData, "returnTo"), "/welcome"));
 }
 

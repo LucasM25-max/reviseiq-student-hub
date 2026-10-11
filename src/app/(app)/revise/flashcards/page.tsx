@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FlashcardReview } from "@/components/revise/flashcard-review";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireOnboardedUser } from "@/lib/auth/session";
+import { markTaskStarted } from "@/lib/today/actions";
 import { gradeCardFormAction, suspendCardFormAction } from "@/lib/flashcards/actions";
 import { deckSummaryFor, dueQueueFor } from "@/lib/flashcards/review";
 import { formatInterval, RATINGS } from "@/lib/fsrs";
@@ -20,8 +21,17 @@ const RATING_LABEL: Record<string, string> = {
   EASY: "Easy",
 };
 
-export default async function FlashcardsPage() {
+export default async function FlashcardsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireOnboardedUser();
+
+  // Arriving from Today: record the start so actualMinutes means something.
+  const query = await searchParams;
+  const taskId = typeof query.task === "string" ? query.task : null;
+  if (taskId) await markTaskStarted(user.id, taskId);
 
   const now = new Date();
   const [summary, queue] = await Promise.all([
@@ -42,8 +52,11 @@ export default async function FlashcardsPage() {
               : `${summary.due} due · ${summary.total} in your deck`}
           </p>
         </div>
-        <Link href="/revise" className="rounded text-sm underline hover:no-underline">
-          Back to Revise
+        <Link
+          href={taskId ? "/today" : "/revise"}
+          className="rounded text-sm underline hover:no-underline"
+        >
+          {taskId ? "Back to Today" : "Back to Revise"}
         </Link>
       </header>
 

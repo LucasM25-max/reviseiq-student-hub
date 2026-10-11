@@ -48,6 +48,9 @@ model User {
   specPointMastery       SpecPointMastery[]
   flashcards             Flashcard[]
   blurtAttempts          BlurtAttempt[]
+  dayPlans               DayPlan[]
+  learningNowFlags       LearningNowFlag[]
+  schoolTests            SchoolTest[]
   questionSets           QuestionSet[]
   questionAttempts       QuestionAttempt[]
 
@@ -240,6 +243,7 @@ model Subject {
   enrolments  SubjectEnrolment[]
   practicals  Practical[]
   questions   Question[]
+  schoolTests SchoolTest[]
 }
 
 enum SubjectCode {
@@ -283,6 +287,7 @@ model SubTopic {
   noteSections NoteSection[]
   blurtPrompts BlurtPrompt[]
   questions    Question[]
+  learningNowFlags LearningNowFlag[]
 
   @@unique([topicId, code])
   @@index([topicId, order])
@@ -960,4 +965,110 @@ model BlurtAttempt {
 
   @@index([userId, createdAt])
   @@index([promptId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7 — the Today engine
+// ---------------------------------------------------------------------------
+
+/// One day's plan. Regenerated rather than mutated, so history stays honest.
+model DayPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  /// The local date this plan is for, at UTC midnight. One live plan per day.
+  planDate  DateTime @db.Date
+  mode      String
+  targetMinutes Int
+  /// Stamped so scheduler versions can be compared against completion rates.
+  algoVersion String
+  /// Shown when the NOT_LEARNT gate is shut, so its absence is never silent.
+  gateMessage String?
+  /// Set when the day is deliberately empty — an exam day, or scheduling has ended.
+  suppressedReason String?
+  /// Superseded by a later plan for the same day ("I've only got N minutes").
+  supersededAt DateTime?
+  createdAt DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks PlanTask[]
+
+  @@index([userId, planDate])
+}
+
+model PlanTask {
+  id       String     @id @default(cuid())
+  planId   String
+  order    Int
+  type     String
+  status   TaskStatus @default(PENDING)
+  subjectId   String?
+  subTopicId  String?
+  title       String
+  rationale   String
+  estMinutes  Int
+  actualMinutes Int?
+  /// Where the task sends the student. Built at generation time, payload included.
+  targetHref  String
+  /// The frozen payload: card ids, question ids, lesson id. Stable for the day.
+  payload     Json?
+  /// The QuestionSet snapshot backing a questions task, when there is one.
+  setId       String?
+  score       Float   @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  plan DayPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, order])
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+  SKIPPED
+  SWAPPED
+}
+
+/// "We're doing this in school now" — escape hatch 1 for the NOT_LEARNT gate.
+model LearningNowFlag {
+  id         String   @id @default(cuid())
+  userId     String
+  subTopicId String
+  /// 28 days from creation, then it lapses rather than lingering.
+  expiresAt  DateTime
+  /// Set automatically when a school test covers unlearnt content.
+  auto       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subTopic SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subTopicId])
+  @@index([userId, expiresAt])
+}
+
+/// A real deadline a student actually has (D25).
+model SchoolTest {
+  id          String         @id @default(cuid())
+  userId      String
+  subjectId   String
+  date        DateTime       @db.Date
+  kind        SchoolTestKind @default(CLASS_TEST)
+  label       String?
+  subTopicIds String[]
+  /// "How did it go?" — asked once, the day after.
+  outcome     String?
+  outcomeAskedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+enum SchoolTestKind {
+  CLASS_TEST
+  END_OF_TOPIC
+  SCHOOL_MOCK
 }

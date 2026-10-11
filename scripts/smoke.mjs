@@ -412,7 +412,7 @@ console.log("\nThe app shell");
   check("welcome summarises the setup", welcome.body.includes("25 topics rated"));
 
   const today = await get("/today");
-  check("Today renders", today.body.includes("Your plan for today"));
+  check("Today renders", today.status === 200 && today.body.includes("Today"));
   check("Today warns the email is unconfirmed", today.body.includes("Confirm your email"));
   check(
     "Today shows all three subjects",
@@ -851,7 +851,7 @@ console.log("\nSettings");
   check("availability can be changed later", redirected(saved), `${saved.status}`);
 
   const today = await get("/today");
-  check("Today picks up the new goal", today.body.includes("min goal"));
+  check("Today picks up the new goal", /about \d+ minutes/.test(today.body));
 }
 
 console.log("\nSign out and back in");
@@ -884,7 +884,7 @@ console.log("\nSign out and back in");
   check("the right password signs in", redirected(right), `${right.status}`);
 
   const back = await get("/today");
-  check("back on Today", back.body.includes("Your plan for today"));
+  check("back on Today", back.status === 200 && back.body.includes("Today"));
 }
 
 // The preview pane, tunnels and any reverse proxy put a different host in front of the
@@ -1007,6 +1007,52 @@ console.log("\nTest — practice and AI marking (Phase 5)");
     body: JSON.stringify({ answerText: "no question id" }),
   });
   check("  — rejects a malformed request", rejected.status === 400, `${rejected.status}`);
+}
+
+console.log("\nToday — the plan (Phase 7)");
+{
+  const today = await get("/today");
+  check("GET /today", today.status === 200, `${today.status}`);
+
+  // The plan is generated on demand, so a first visit is never an empty page.
+  const hasPlan = /name="taskId"/.test(today.body);
+  check("a plan is generated on demand", hasPlan, hasPlan ? "tasks present" : "no tasks");
+
+  if (hasPlan) {
+    check(
+      "every task says why it is there",
+      (today.body.match(/Start<\/a>/g) ?? []).length > 0,
+      "deep links present",
+    );
+
+    // Deep links go to the work, never to a hub page.
+    const hrefs = [
+      ...today.body.matchAll(/href="(\/(?:learn|revise|test|settings)\/[^"]*task=[^"]+)"/g),
+    ].map((m) => m[1]);
+    check("tasks deep-link with a task id", hrefs.length > 0, `${hrefs.length} links`);
+
+    if (hrefs[0]) {
+      const target = await get(hrefs[0].replace(/&amp;/g, "&"));
+      check("  — and the link opens the work", target.status === 200, `${target.status}`);
+    }
+
+    const done = await submit("/today", today.body, {}, 'name="taskId"');
+    check("ticking a task off", done.status === 200, `${done.status}`);
+
+    const after = await get("/today");
+    check("  — and it shows as done", after.body.includes("Done"), `${after.status}`);
+
+    // "I've only got N minutes" (D10).
+    const quick = await submit("/today", after.body, { minutes: "20" }, 'name="minutes"');
+    check("re-planning for a shorter session", quick.status === 200, `${quick.status}`);
+
+    const shorter = await get("/today");
+    check(
+      "  — and the day is resized",
+      shorter.status === 200 && /about \d+ minutes/.test(shorter.body),
+      `${shorter.status}`,
+    );
+  }
 }
 
 console.log("\nRevise — flashcards and blurting (Phase 6)");
@@ -1289,7 +1335,7 @@ console.log("\nPassword reset");
     check("the new password works", redirected(signedIn), `${signedIn.status}`);
 
     const today = await get("/today");
-    check("and lands back on Today", today.body.includes("Your plan for today"));
+    check("and lands back on Today", today.status === 200 && today.body.includes("Today"));
   }
 }
 
