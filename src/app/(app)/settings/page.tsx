@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   Clock,
   ListChecks,
   Sparkles,
@@ -50,6 +51,18 @@ const SECTIONS = [
     title: "Your week",
     description: "Revision time, daily goal and reminders.",
     Icon: Clock,
+  },
+  {
+    href: "/settings/tests",
+    title: "School tests",
+    description: "A test on Friday changes what Today asks of you.",
+    Icon: ClipboardList,
+  },
+  {
+    href: "/settings/calendar",
+    title: "Your school year",
+    description: "Term dates, holidays and study leave.",
+    Icon: CalendarDays,
   },
 ] as const;
 

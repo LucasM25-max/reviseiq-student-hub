@@ -11,6 +11,7 @@ import "server-only";
 import { startOfUtcDay } from "@/lib/ai/usage";
 import { subjectSlugFromId } from "@/lib/content/queries";
 import { prisma } from "@/lib/db/prisma";
+import { periodFor, type PeriodRow } from "@/lib/today/calendar";
 import { LEARNING_NOW_DAYS, ALGO_VERSION } from "@/lib/today/weights";
 import type {
   CalendarPeriod,
@@ -25,13 +26,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Which calendar period today falls in (D24).
  *
- * The school calendar UI is not built yet, so this reads the one thing that is
- * stored — exam dates — and infers study leave and exam season from them. Term is
- * the honest default until a student can tell us otherwise.
+ * A stored `TermPeriod` wins when the student has one — they know their school's
+ * dates and we do not. An exam still overrides everything: sitting a paper today is
+ * what today *is*, whatever the calendar says about term.
  */
 export function inferCalendarPeriod(
   now: Date,
   examDates: Array<{ date: Date; paper: number; subjectId: string }>,
+  periods: PeriodRow[] = [],
 ): CalendarPeriod {
   const upcoming = examDates
     .filter((exam) => exam.date.getTime() >= startOfUtcDay(now).getTime())
@@ -45,6 +47,16 @@ export function inferCalendarPeriod(
       kind: "EXAM_SEASON",
       endDate: upcoming[upcoming.length - 1]?.date ?? now,
       examToday: { subjectId: examToday.subjectId, paper: examToday.paper },
+    };
+  }
+
+  const stored = periodFor(now, periods);
+  if (stored) {
+    return {
+      kind: stored.kind,
+      endDate: stored.endDate,
+      minutesPerDay: stored.minutesPerDay ?? undefined,
+      examToday: null,
     };
   }
 
@@ -87,6 +99,7 @@ export async function buildSnapshot(
     ragRows,
     masteryRows,
     flagRows,
+    periodRows,
     testRows,
     cardRows,
     lessonRows,
@@ -123,6 +136,10 @@ export async function buildSnapshot(
     prisma.learningNowFlag.findMany({
       where: { userId, expiresAt: { gt: now } },
       select: { subTopicId: true, expiresAt: true },
+    }),
+    prisma.termPeriod.findMany({
+      where: { userId },
+      select: { kind: true, startDate: true, endDate: true, minutesPerDay: true, label: true },
     }),
     prisma.schoolTest.findMany({
       where: { userId, date: { gte: startOfUtcDay(now) } },
@@ -277,7 +294,7 @@ export async function buildSnapshot(
       timezone: profile.timezone ?? "Europe/London",
       schedulingEnabled: profile.schedulingEnabled ?? true,
     },
-    calendarPeriod: inferCalendarPeriod(now, examDates),
+    calendarPeriod: inferCalendarPeriod(now, examDates, periodRows),
     schoolTests: testRows.map((row) => ({
       id: row.id,
       subjectId: row.subjectId,

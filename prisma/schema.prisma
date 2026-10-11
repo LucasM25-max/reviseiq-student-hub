@@ -51,6 +51,8 @@ model User {
   dayPlans               DayPlan[]
   learningNowFlags       LearningNowFlag[]
   schoolTests            SchoolTest[]
+  ragSuggestions         RagSuggestion[]
+  termPeriods            TermPeriod[]
   questionSets           QuestionSet[]
   questionAttempts       QuestionAttempt[]
 
@@ -288,6 +290,7 @@ model SubTopic {
   blurtPrompts BlurtPrompt[]
   questions    Question[]
   learningNowFlags LearningNowFlag[]
+  ragSuggestions   RagSuggestion[]
 
   @@unique([topicId, code])
   @@index([topicId, order])
@@ -1071,4 +1074,67 @@ enum SchoolTestKind {
   CLASS_TEST
   END_OF_TOPIC
   SCHOOL_MOCK
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7 (completion) — calendar, suggestions
+// ---------------------------------------------------------------------------
+
+/// A proposed RAG change, never an automatic one (D19, D25).
+///
+/// The cheapest high-quality signal the app gets is a real assessment marked by a
+/// real teacher. It still only ever *suggests*: the student owns their ratings, and
+/// silently rewriting them would break the one thing they control.
+model RagSuggestion {
+  id           String              @id @default(cuid())
+  userId       String
+  subTopicId   String
+  suggested    RagValue
+  reason       String
+  source       RagSuggestionSource
+  /// The test that prompted it, when there was one.
+  schoolTestId String?
+  acceptedAt   DateTime?
+  dismissedAt  DateTime?
+  createdAt    DateTime            @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subTopic SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subTopicId, source])
+  @@index([userId, createdAt])
+}
+
+enum RagSuggestionSource {
+  SCHOOL_TEST
+  MASTERY
+  BLURT
+}
+
+/// A stretch of the school year (D24).
+///
+/// Seeded with England's usual term shape and fully editable, because term dates
+/// vary by a fortnight between counties and a wrong holiday is worse than none.
+model TermPeriod {
+  id            String       @id @default(cuid())
+  userId        String
+  kind          CalendarKind
+  startDate     DateTime     @db.Date
+  endDate       DateTime     @db.Date
+  /// Overrides the daily goal for this stretch.
+  minutesPerDay Int?
+  label         String?
+  createdAt     DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+}
+
+enum CalendarKind {
+  TERM
+  HALF_TERM
+  HOLIDAY
+  STUDY_LEAVE
+  EXAM_SEASON
 }

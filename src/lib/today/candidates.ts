@@ -310,6 +310,33 @@ export function generateCandidates(input: PlannerInput, mode: PlanMode): Generat
       }
     }
 
+    /*
+     * --- Sub-topic RAG refinement (D19) ------------------------------------
+     *
+     * A topic-level rating is a blunt instrument: "Red at cell biology" says
+     * nothing about which half. The first time a topic is actually worked on, a
+     * sixty-second prompt splits it into sub-topics, and everything downstream
+     * gets sharper. Only offered where a topic rating is doing the work and no
+     * sub-topic rating exists yet, so it never asks twice.
+     */
+    const hasOwnRating = input.rag.some(
+      (entry) => entry.scope === "SUBTOPIC" && entry.id === subTopic.id,
+    );
+    const parentRating = input.rag.find(
+      (entry) => entry.scope === "TOPIC" && subTopic.id.startsWith(entry.id),
+    );
+
+    if (!hasOwnRating && parentRating) {
+      push({
+        key: `rag-refine:${subTopic.id}`,
+        type: "RAG_REFINE",
+        ref: { kind: "RAG_REFINE", topicId: parentRating.id },
+        estMinutes: 1,
+        title: `Rate ${subTopic.title} on its own`,
+        higherOnly: false,
+      });
+    }
+
     // --- Practicals --------------------------------------------------------
     for (const practical of subTopic.practicals) {
       push({

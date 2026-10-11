@@ -459,7 +459,7 @@ found and reissued once a key is configured rather than silently persisting.
 
 ---
 
-## Phase 7 — The Today engine · **XL** · ✅ **Core done**
+## Phase 7 — The Today engine · **XL** · ✅ **Done**
 
 The payoff phase. Everything before it exists so this can work.
 
@@ -513,12 +513,37 @@ honest: the five questions the rationale promised are the five the student gets,
 named invariants failed — including the fifteen-minute archetype and the slow-reader case — and
 all passed again on restore, with no residue.
 
-**Carried forward, and genuinely not built:** the school-calendar and school-test **management
-UIs** (D24/D25 — the engine consumes both, and `SchoolTest`/`LearningNowFlag` rows exist, but
-nothing yet lets a student add one); the **nightly Vercel cron** (generation is on-demand only);
-`RagSuggestion` prompts and the post-test _"how did it go?"_ flow; the **end-of-season
-congratulations screen** (D27 — the planner stops correctly, the screen is not built); and
-adaptive re-ranking on surprising performance. Mini and full mocks belong to Phase 8.
+**Completed afterwards, closing the phase.** Everything previously carried forward now exists:
+
+- **School tests** (D25) — `/settings/tests` adds, scopes and removes them. Adding one creates the
+  `LearningNowFlag` for every sub-topic it covers, so the gate opens for content a student is
+  tested on in four days, and re-plans today immediately.
+- **The school calendar** (D24) — `/settings/calendar`, seeded with England's usual twelve periods
+  for the student to correct. Study leave and exam season win over the term they overlap, because
+  they describe what the student is actually doing.
+- **The nightly cron** — `/api/cron/plans` with `vercel.json`, bearer-authenticated and **closed**
+  rather than open when `CRON_SECRET` is unset. One student's bad data cannot stop the run.
+- **`RagSuggestion` and the post-test prompt** — _"How did the Biology test go?"_, asked once, the
+  day after, becoming a suggestion the student accepts or dismisses. Never an automatic change:
+  the RAG grid is the one thing they fully control.
+- **The congratulations screen and the resit hatch** (D27).
+- **Adaptive re-ranking** — only on a genuinely surprising result, and it only ever _removes_
+  work. A plan that rearranges itself under a student mid-session is worse than one slightly wrong.
+- **`RAG_REFINE` candidates** (D19) — offered once, only where a topic-level rating is doing the
+  work for a sub-topic that has none of its own.
+
+**Two bugs the probes caught, neither visible to any pure test:**
+
+- Ending the season left today's already-generated plan **live**, so a student finished their last
+  exam and was still handed a list of tasks. `endSeasonIfPast` now retires it.
+- The resit hatch **undid itself**. Resuming flipped the flag back on and the very next page load
+  ran the same season check against exam dates that were all still in the past, locking the student
+  straight back out — the exact failure a stored flag exists to prevent. `examsCompletedAt` is now
+  kept as a watermark, and the season only ends again once there is an exam later than it.
+
+Both now have database-backed regression tests, verified by sabotage: each fault was reintroduced,
+failed its named test, and passed again on restore with no residue. Mini and full mocks remain
+Phase 8.
 
 ---
 

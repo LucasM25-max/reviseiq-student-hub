@@ -14,6 +14,7 @@ import "server-only";
 import { markOpenResponse } from "@/lib/ai/mark";
 import { markedByFor, type MarkInput, type MarkResult } from "@/lib/ai/types";
 import { createCardsForAttempt, retireProvenCards } from "@/lib/flashcards/create";
+import { adaptPlanAfterAttempt } from "@/lib/today/actions";
 import { autoMark, isObjective } from "@/lib/marking/auto";
 import { nextMastery, weightFor } from "@/lib/marking/mastery";
 import { prisma } from "@/lib/db/prisma";
@@ -213,6 +214,24 @@ export async function markAnswer(request: MarkRequest): Promise<MarkSuccess | Ma
       context: request.context,
       result,
     });
+  }
+
+  /*
+   * A surprising result means the rest of today is aimed at the wrong thing. Only
+   * ever trims; best-effort, because adapting a plan must never cost a mark.
+   */
+  try {
+    const subTopic = await prisma.question.findUnique({
+      where: { id: question.id },
+      select: { primarySubTopicId: true },
+    });
+    await adaptPlanAfterAttempt(request.userId, {
+      subTopicId: subTopic?.primarySubTopicId ?? null,
+      awardedMarks: result.awardedMarks,
+      maxMarks: result.maxMarks,
+    });
+  } catch (error) {
+    console.error("[marking] could not adapt today's plan", error);
   }
 
   return { ok: true, result, attemptId: attempt.id };

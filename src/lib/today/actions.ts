@@ -14,6 +14,7 @@ import { startOfUtcDay } from "@/lib/ai/usage";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { formError, formSuccess, text, type FormState } from "@/lib/forms";
+import { reactionTo, surpriseFrom } from "@/lib/today/adapt";
 import { ensurePlanFor } from "@/lib/today/materialise";
 
 const idSchema = z.string().min(1).max(100);
@@ -156,6 +157,47 @@ export async function markTaskDoneById(userId: string, taskId: string): Promise<
   });
 
   revalidatePath("/today");
+}
+
+/**
+ * Re-ranks what is left of the day after a surprising result (doc 05 §8).
+ *
+ * Only ever *removes* work on the sub-topic that surprised us, and only when the
+ * result was far from what the plan assumed. It never adds, never reorders, and
+ * never touches anything already done — a plan that rearranges itself while a
+ * student is working through it is worse than one that is slightly wrong.
+ */
+export async function adaptPlanAfterAttempt(
+  userId: string,
+  input: { subTopicId: string | null; awardedMarks: number; maxMarks: number },
+): Promise<string | null> {
+  if (!input.subTopicId) return null;
+
+  const reaction = reactionTo(surpriseFrom(input.awardedMarks, input.maxMarks));
+  if (!reaction) return null;
+
+  const planDate = startOfUtcDay(new Date());
+
+  const plan = await prisma.dayPlan.findFirst({
+    where: { userId, planDate, supersededAt: null },
+    select: { id: true },
+  });
+  if (!plan) return null;
+
+  const dropped = await prisma.planTask.updateMany({
+    where: {
+      planId: plan.id,
+      status: "PENDING",
+      subTopicId: input.subTopicId,
+      type: { in: reaction.drop },
+    },
+    data: { status: "SKIPPED" },
+  });
+
+  if (dropped.count === 0) return null;
+
+  revalidatePath("/today");
+  return reaction.message;
 }
 
 /** Records that a student has opened a task, so `actualMinutes` means something. */

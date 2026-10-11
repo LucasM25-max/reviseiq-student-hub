@@ -1129,6 +1129,60 @@ console.log("\nRevise — flashcards and blurting (Phase 6)");
   }
 }
 
+console.log("\nSchool tests and the calendar (Phase 7)");
+{
+  const tests = await get("/settings/tests");
+  check(
+    "GET /settings/tests",
+    tests.status === 200 && tests.body.includes("Add a test"),
+    `${tests.status}`,
+  );
+
+  const calendar = await get("/settings/calendar");
+  check(
+    "GET /settings/calendar",
+    calendar.status === 200 && calendar.body.includes("school year"),
+    `${calendar.status}`,
+  );
+
+  const canAdd = tests.body.includes('name="subTopicId"');
+  check("the test form lists topics to scope it to", canAdd, canAdd ? "topics listed" : "none");
+
+  if (canAdd) {
+    const inThreeDays = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    const subTopic = /name="subTopicId" value="([^"]+)"/.exec(tests.body)?.[1];
+    const subject = /name="subjectId"[\s\S]*?<option value="([^"]+)"/.exec(tests.body)?.[1];
+
+    const added = await submit(
+      "/settings/tests",
+      tests.body,
+      {
+        date: inThreeDays,
+        kind: "END_OF_TOPIC",
+        subTopicId: subTopic ?? "",
+        subjectId: subject ?? "",
+      },
+      'name="subTopicId"',
+    );
+    check("adding a school test", added.status === 200, `${added.status}`);
+
+    const after = await get("/settings/tests");
+    check("  — and it is listed", after.body.includes("End of topic"), `${after.status}`);
+
+    // The plan has to know immediately: the student just told us something important.
+    const today = await get("/today");
+    check(
+      "  — and today's plan already reflects it",
+      today.status === 200 && /test/i.test(today.body),
+      `${today.status}`,
+    );
+  }
+
+  // The cron endpoint is closed without its secret.
+  const cron = await request("/api/cron/plans");
+  check("the nightly cron refuses an unsigned request", cron.status === 401, `${cron.status}`);
+}
+
 console.log("\nBehind a reverse proxy");
 {
   const publicHost = "3000-smoketest.e2b.app";

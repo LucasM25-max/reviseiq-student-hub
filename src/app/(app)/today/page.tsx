@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import {
+  ResumeSchedulingForm,
+  SuggestionForm,
+  TestOutcomeForm,
+} from "@/components/settings/calendar-forms";
 import { QuickSessionForm, TaskActions } from "@/components/today/plan-view";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { regeneratePlanFormAction } from "@/lib/today/actions";
 import { ensurePlanFor } from "@/lib/today/materialise";
+import {
+  endSeasonIfPast,
+  markCongratulationsSeen,
+  owedCongratulations,
+  pendingSuggestionsFor,
+  testAwaitingOutcome,
+} from "@/lib/today/prompts";
 
 export const metadata: Metadata = {
   title: "Today",
@@ -38,7 +50,20 @@ export default async function TodayPage() {
   const user = await requireOnboardedUser();
 
   const now = new Date();
-  const plan = await ensurePlanFor(user.id, now);
+
+  // The season ends on its own, so a student who never gets a cron run still lands
+  // on the right screen (D27).
+  await endSeasonIfPast(user.id, now);
+
+  const [plan, suggestions, awaitingOutcome, congratulations] = await Promise.all([
+    ensurePlanFor(user.id, now),
+    pendingSuggestionsFor(user.id),
+    testAwaitingOutcome(user.id, now),
+    owedCongratulations(user.id),
+  ]);
+
+  if (congratulations) await markCongratulationsSeen(user.id);
+
   const startedAt = now.toISOString();
 
   if (!plan) {
@@ -89,11 +114,17 @@ export default async function TodayPage() {
         </section>
       ) : plan.suppressedReason === "SCHEDULING_OFF" ? (
         <section className="rounded-lg border border-[var(--border)] p-6">
-          <h2 className="text-lg font-medium">That&rsquo;s your exams done</h2>
+          <h2 className="text-lg font-medium">
+            {congratulations ? "That's it. You're done." : "That's your exams done"}
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            We&rsquo;ve stopped planning. Everything stays browsable, and if you have a resit,
-            add the date in settings and plans start again.
+            {congratulations
+              ? "Every paper sat. However they went, you did the work — and the work is the part that was yours to do."
+              : "We've stopped planning. Everything stays browsable."}
           </p>
+          <div className="mt-4">
+            <ResumeSchedulingForm />
+          </div>
         </section>
       ) : live.length === 0 ? (
         <section className="rounded-lg border border-[var(--border)] p-6">
@@ -132,6 +163,29 @@ export default async function TodayPage() {
           ))}
         </ol>
       )}
+
+      {awaitingOutcome ? (
+        <section className="rounded-lg border border-[var(--border)] p-4">
+          <TestOutcomeForm testId={awaitingOutcome.id} subject={awaitingOutcome.subject} />
+        </section>
+      ) : null}
+
+      {suggestions.length > 0 ? (
+        <section aria-labelledby="suggestions" className="space-y-2">
+          <h2 id="suggestions" className="text-lg font-semibold">
+            Does this still look right?
+          </h2>
+          {suggestions.map((suggestion) => (
+            <SuggestionForm
+              key={suggestion.id}
+              suggestionId={suggestion.id}
+              subTopic={suggestion.subTopic}
+              suggested={suggestion.suggested}
+              reason={suggestion.reason}
+            />
+          ))}
+        </section>
+      ) : null}
 
       {plan.gateMessage ? (
         <p className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4 text-sm">
